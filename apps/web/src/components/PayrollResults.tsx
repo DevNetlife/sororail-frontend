@@ -2,17 +2,19 @@
 
 import { ErrorNotice, SuccessNotice } from "@/components/Feedback";
 import { Money } from "@/components/Money";
+import { PayrollFee } from "@/components/PayrollFee";
 import type { PayrollState } from "@/hooks/usePayroll";
 
 type ResultsProps = Pick<
   PayrollState,
-  "previewError" | "receipt" | "batches" | "decimals" | "sendError" | "results"
+  "previewError" | "receipt" | "feeEstimate" | "batches" | "decimals" | "sendError" | "results"
 >;
 
 /** What the chain said: the preview outcome, send errors and paid batches (#438). */
 export function PayrollResults({
   previewError,
   receipt,
+  feeEstimate,
   batches,
   decimals,
   sendError,
@@ -28,6 +30,7 @@ export function PayrollResults({
           <Money value={receipt.total} decimals={decimals ?? undefined} /> total. Nothing has been sent.
         </SuccessNotice>
       ) : null}
+      {receipt && feeEstimate ? <PayrollFee estimate={feeEstimate} /> : null}
       {sendError ? <ErrorNotice error={sendError} /> : null}
       {results.map((result) => (
         <SuccessNotice key={result.hash} hash={result.hash}>
