@@ -17,6 +17,7 @@ import { usePositionCard } from "@/hooks/usePositionCard";
 import { grantStatus, type PositionStatus } from "@/lib/position-status";
 import type { Position } from "@/lib/positions";
 import { useWallet } from "@/lib/wallet";
+import { trackSubmit } from "@/lib/session-activity";
 
 /** One tracked vesting grant: schedule, balances and its actions (moved from `vesting/page.tsx`, #439). */
 export function GrantCard({
@@ -79,7 +80,10 @@ export function GrantCard({
       throw new SigningError("Wallet disconnected. Reconnect to continue.");
     }
     const call = action === "claim" ? await client.claim() : await client.revoke();
-    const sent = await call.signAndSend(signer);
+    const sent = await trackSubmit(
+      action === "claim" ? "Claim vested tokens" : "Revoke grant",
+      () => call.signAndSend(signer),
+    );
     setDone({
       text:
         action === "claim"

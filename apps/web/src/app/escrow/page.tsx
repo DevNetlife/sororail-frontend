@@ -29,9 +29,24 @@ import { filterPositions } from "@/lib/position-filter";
 import type { Position } from "@/lib/positions";
 import { RPC_URL } from "@/lib/network";
 import { useWallet } from "@/lib/wallet";
+import { trackSubmit } from "@/lib/session-activity";
 import { usePositionCard } from "@/hooks/usePositionCard";
+import { useNetworkFee } from "@/hooks/useNetworkFee";
 
 type Action = "fund" | "release" | "refund" | "dispute" | "resolve";
+
+/** The prepared transaction for an escrow action; shared by the fee estimate and the send (#399). */
+function buildEscrowCall(client: EscrowClient, action: Action, splitBps: number) {
+  return action === "fund"
+    ? client.fund()
+    : action === "release"
+      ? client.release()
+      : action === "refund"
+        ? client.refund()
+        : action === "dispute"
+          ? client.dispute()
+          : client.resolve(splitBps);
+}
 
 export default function EscrowPage() {
   const allPositions = usePositions("escrow");
@@ -103,6 +118,17 @@ function EscrowCard({ position }: { position: Position }) {
     return () => clearInterval(id);
   }, []);
 
+  // Estimated network fee for the action being confirmed (#399). Re-estimated
+  // when the split changes, since a resolve's footprint depends on it.
+  const feeKey = pending ? `${pending}:${pending === "resolve" ? splitBps : ""}` : "none";
+  const fee = useNetworkFee(feeKey, async () => {
+    if (!pending) throw new Error("No action is pending.");
+    const { resources } = await (
+      await buildEscrowCall(client, pending, splitBps)
+    ).simulateWithResources();
+    return resources.resourceFee;
+  });
+
   async function run(action: Action) {
     if (!signer || !address) {
       setActionError(
@@ -113,17 +139,8 @@ function EscrowCard({ position }: { position: Position }) {
     setBusy(true);
     setActionError(null);
     try {
-      const call =
-        action === "fund"
-          ? await client.fund()
-          : action === "release"
-            ? await client.release()
-            : action === "refund"
-              ? await client.refund()
-              : action === "dispute"
-                ? await client.dispute()
-                : await client.resolve(splitBps);
-      const sent = await call.signAndSend(signer);
+      const call = await buildEscrowCall(client, action, splitBps);
+      const sent = await trackSubmit(successMessage(action), () => call.signAndSend(signer));
       setDone({ text: successMessage(action), hash: sent.hash });
       setPending(null);
       await refresh();
@@ -346,6 +363,7 @@ function EscrowCard({ position }: { position: Position }) {
           ]}
           irreversible={irreversibleNote(pending, splitBps)}
           confirmLabel={confirmTitle(pending)}
+          fee={fee}
           busy={busy}
           error={actionError ? <ErrorNotice error={actionError} /> : null}
           onConfirm={() => void run(pending)}

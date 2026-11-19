@@ -8,7 +8,9 @@ import { Money } from "@/components/Money";
 import { PayrollChunkProgress } from "@/components/PayrollChunkProgress";
 import { PayrollPreview } from "@/components/PayrollPreview";
 import { PayrollResults } from "@/components/PayrollResults";
+import { PendingTransactionBanner } from "@/components/PendingTransactionBanner";
 import { usePayroll } from "@/hooks/usePayroll";
+import { usePendingTransaction } from "@/hooks/usePendingTransaction";
 import { BATCH_PAYOUT_CONTRACT } from "@/lib/network";
 
 export default function PayrollPage() {
@@ -45,6 +47,11 @@ export default function PayrollPage() {
     restoreDraft,
   } = payroll;
 
+  // A batch is in flight from signature until it is in a ledger (#398).
+  const inFlight = busy && chunks.some((chunk) => chunk.state === "pending" || chunk.state === "signed");
+  const latestHash = [...chunks].reverse().find((chunk) => chunk.state === "confirmed" && chunk.hash)?.hash;
+  const transaction = usePendingTransaction({ pending: inFlight, hash: latestHash });
+
   return (
     <div className="stack">
       <div>
@@ -54,6 +61,13 @@ export default function PayrollPage() {
           all-or-nothing: if any transfer fails, nobody in that batch is paid.
         </p>
       </div>
+
+      <PendingTransactionBanner
+        status={transaction.status}
+        hash={transaction.hash}
+        elapsedSeconds={transaction.elapsedSeconds}
+        onDismiss={transaction.dismiss}
+      />
 
       {!address ? (
         <div className="card">
