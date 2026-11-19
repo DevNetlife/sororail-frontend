@@ -15,11 +15,14 @@ import { Address, Money } from "@/components/Money";
 import { BATCH_PAYOUT_CONTRACT, NATIVE_TOKEN } from "@/lib/network";
 import { useRpc } from "@/lib/rpc-provider";
 import {
+  buildPayrollTemplate,
   parseCsv,
   removeCsvLines,
   splitPayrollPayments,
   type ParsedLine,
 } from "@/lib/payroll";
+import { labelFor, type AddressBookEntry } from "@/lib/addressBook";
+import { AddressBook } from "@/components/AddressBook";
 import { fetchTokenDecimals } from "@/lib/token";
 import { useWallet } from "@/lib/wallet";
 
@@ -37,6 +40,8 @@ export default function PayrollPage() {
   const [sendError, setSendError] = useState<unknown>(null);
   const [results, setResults] = useState<{ hash: string; count: number }[]>([]);
   const [dragActive, setDragActive] = useState(false);
+  // Session-only labels for recipients; never persisted (see lib/addressBook).
+  const [addressBook, setAddressBook] = useState<AddressBookEntry[]>([]);
   const [fileError, setFileError] = useState<string | null>(null);
   const previewSeq = useRef(0);
   // The token's decimals, read from the token contract. Amounts are scaled by
@@ -63,6 +68,20 @@ export default function PayrollPage() {
   }, []);
 
   const { clientOptions } = useRpc();
+
+  const downloadTemplate = useCallback(() => {
+    const url = URL.createObjectURL(
+      new Blob([buildPayrollTemplate()], { type: "text/csv" }),
+    );
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "payroll-template.csv";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  }, []);
+
   const client = useMemo(
     () => new BatchPayoutClient(clientOptions(BATCH_PAYOUT_CONTRACT, address)),
     [clientOptions, address],
@@ -279,6 +298,8 @@ export default function PayrollPage() {
         </div>
       ) : null}
 
+      <AddressBook entries={addressBook} onChange={setAddressBook} />
+
       <div className="card stack stack--tight">
         <h2 id="recipients-heading">Recipients</h2>
         <p className="small muted m-0">
@@ -305,6 +326,9 @@ export default function PayrollPage() {
           <label className="button" htmlFor="payroll-csv-file">
             Choose file
           </label>
+          <button type="button" className="button" onClick={downloadTemplate}>
+            Download template
+          </button>
           <input
             id="payroll-csv-file"
             type="file"
@@ -356,6 +380,11 @@ export default function PayrollPage() {
                     <td>
                       {line.to ? (
                         <Address value={line.to} />
+                        {labelFor(addressBook, line.to) ? (
+                          <span className="small muted">
+                            {" "}({labelFor(addressBook, line.to)})
+                          </span>
+                        ) : null}
                       ) : (
                         <span className="muted">—</span>
                       )}
