@@ -5,19 +5,21 @@
  * network switcher that can reach mainnet would invite exactly the mistake
  * SECURITY.md asks people not to make.
  */
+import { parseEnv } from "./env";
+
 export const NETWORK_PASSPHRASE = "Test SDF Network ; September 2015";
 
-const DEFAULT_RPC_URL = "https://soroban-testnet.stellar.org";
+const env = parseEnv({
+  NEXT_PUBLIC_RPC_URL: process.env["NEXT_PUBLIC_RPC_URL"],
+  NEXT_PUBLIC_TOKEN_ID: process.env["NEXT_PUBLIC_TOKEN_ID"],
+  NEXT_PUBLIC_BATCH_PAYOUT_ID: process.env["NEXT_PUBLIC_BATCH_PAYOUT_ID"],
+  NEXT_PUBLIC_EXPLORER_URL: process.env["NEXT_PUBLIC_EXPLORER_URL"],
+});
 
-export const RPC_URL = process.env["NEXT_PUBLIC_RPC_URL"] ?? DEFAULT_RPC_URL;
-
-const DEFAULT_NATIVE_TOKEN =
-  "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC";
+export const RPC_URL = env.rpcUrl;
 
 /** Native XLM's Stellar Asset Contract on testnet. */
-export const NATIVE_TOKEN =
-  process.env["NEXT_PUBLIC_TOKEN_ID"] ??
-  DEFAULT_NATIVE_TOKEN;
+export const NATIVE_TOKEN = env.tokenId;
 
 /**
  * The `batch_payout` deployment.
@@ -29,9 +31,7 @@ export const NATIVE_TOKEN =
  *
  * From DEPLOYMENTS.md in the contracts repo.
  */
-export const BATCH_PAYOUT_CONTRACT =
-  process.env["NEXT_PUBLIC_BATCH_PAYOUT_ID"] ??
-  "CDKJ56S7K7QC4LG6SFF2OGDTG6N4QBCJOVRWHY7MKCWD5JPQ6MDAHRAM";
+export const BATCH_PAYOUT_CONTRACT = env.batchPayoutId;
 
 /** Where to send someone to fund a testnet account. */
 export const FRIENDBOT_URL = "https://friendbot.stellar.org";
@@ -64,7 +64,7 @@ export function resolveExplorerBase(
 
 const EXPLORER_BASE = resolveExplorerBase(
   RPC_URL,
-  process.env["NEXT_PUBLIC_EXPLORER_URL"],
+  env.explorerUrl ?? undefined,
 );
 
 /** Block explorer link for a transaction, or `null` if the network has none. */
