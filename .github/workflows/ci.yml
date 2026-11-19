@@ -26,6 +26,14 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           node-version: ${{ matrix.node-version }}
+      # Reuse the Next.js build cache between runs. Keyed by lockfile and app source, so a change to either starts cold.
+      - name: Cache Next.js build output
+        uses: actions/cache@v4
+        with:
+          path: apps/web/.next/cache
+          key: nextjs-${{ runner.os }}-${{ matrix.node-version }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('apps/web/**/*.{ts,tsx,js,jsx,mjs,css,json}') }}
+          restore-keys: |
+            nextjs-${{ runner.os }}-${{ matrix.node-version }}-${{ hashFiles('pnpm-lock.yaml') }}-
       # @sororail/sdk only exposes its type declarations from dist/, built by
       # tsup, so apps/web can't typecheck against it until this runs first.
       - run: pnpm build
@@ -43,6 +51,8 @@ jobs:
       - run: pnpm --filter @sororail/sdk typecheck:examples
       - run: pnpm typecheck
       - run: pnpm lint
+      # Dead code: unused files, exports and dependencies across the workspace. Pinned to major 5.
+      - run: pnpm knip
       - run: pnpm audit
       # Playwright needs a built app and its own browser download.
       # Cache browser binaries to avoid re-downloading on every run (#111).
