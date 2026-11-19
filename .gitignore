@@ -10,5 +10,6 @@ coverage/
 .DS_Store
 playwright-report/
 test-results/
+.lighthouseci/
 api-docs/
 package-lock.json

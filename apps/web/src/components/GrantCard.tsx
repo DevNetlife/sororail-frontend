@@ -12,11 +12,20 @@ import { Figure, PositionCardShell } from "@/components/PositionCardShell";
 import { Schedule } from "@/components/Schedule";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { usePositionCard } from "@/hooks/usePositionCard";
+import { grantStatus, type PositionStatus } from "@/lib/position-status";
 import type { Position } from "@/lib/positions";
 import { useWallet } from "@/lib/wallet";
 
 /** One tracked vesting grant: schedule, balances and its actions (moved from `vesting/page.tsx`, #439). */
-export function GrantCard({ position }: { position: Position }) {
+export function GrantCard({
+  position,
+  onStatus,
+  hidden = false,
+}: {
+  position: Position;
+  onStatus?: (contractId: string, status: PositionStatus) => void;
+  hidden?: boolean;
+}) {
   const { address, signer } = useWallet();
   const [claimable, setClaimable] = useState<bigint | null>(null);
   const [pending, setPending] = useState<"claim" | "revoke" | null>(null);
@@ -44,6 +53,11 @@ export function GrantCard({ position }: { position: Position }) {
     void refresh();
   }, [refresh]);
   usePositionPolling(refresh);
+
+  const status = grant ? grantStatus(grant, now) : undefined;
+  useEffect(() => {
+    if (status && onStatus) onStatus(position.contractId, status);
+  }, [status, onStatus, position.contractId]);
 
   useEffect(() => {
     const id = setInterval(
@@ -74,6 +88,8 @@ export function GrantCard({ position }: { position: Position }) {
     setPending(null);
     await refresh();
   });
+
+  if (hidden) return null;
 
   return (
     <PositionCardShell
