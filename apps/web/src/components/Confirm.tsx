@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
+import { describeNetworkFee, type NetworkFeeState } from "@/lib/network-fee";
+
 const FOCUSABLE_SELECTOR =
   'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
@@ -28,6 +30,7 @@ export function Confirm({
   lines,
   irreversible,
   confirmLabel,
+  fee,
   danger = false,
   busy = false,
   error = null,
@@ -40,6 +43,11 @@ export function Confirm({
   /** What cannot be undone, in plain words. */
   irreversible: string;
   confirmLabel: string;
+  /**
+   * The estimated network fee (#399). When given, a fee line is always shown,
+   * so it reads "Estimating…" first and never shifts the layout on load.
+   */
+  fee?: NetworkFeeState;
   danger?: boolean;
   busy?: boolean;
   error?: ReactNode;
@@ -146,6 +154,12 @@ export function Confirm({
               <span>{line.value}</span>
             </div>
           ))}
+          {fee ? (
+            <div className="modal__line" data-testid="confirm-network-fee">
+              <span className="muted">Estimated network fee</span>
+              <span aria-live="polite">{describeNetworkFee(fee)}</span>
+            </div>
+          ) : null}
         </div>
 
         <div className="notice notice--warn">
