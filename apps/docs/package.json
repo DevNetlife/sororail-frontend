@@ -7,9 +7,11 @@
     "node": ">=22.12.0"
   },
   "scripts": {
-    "predev": "node scripts/sync-changelog.mjs",
+    "predev": "node scripts/sync-changelog.mjs && pnpm run gen:reference",
     "dev": "astro dev",
-    "prebuild": "node scripts/sync-changelog.mjs",
+    "prebuild": "node scripts/sync-changelog.mjs && pnpm run gen:reference && pnpm run api:build",
+    "gen:reference": "tsx ../../packages/sdk/scripts/gen-error-codes.ts",
+    "api:build": "pnpm --filter @sororail/sdk exec typedoc --out ../../apps/docs/public/api",
     "build": "astro build",
     "typecheck": "tsc --noEmit && node scripts/typecheck-snippets.mjs",
     "preview": "astro preview",

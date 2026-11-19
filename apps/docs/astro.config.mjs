@@ -24,6 +24,7 @@ export default defineConfig({
           items: [
             { label: "Getting started", slug: "getting-started" },
             { label: "Troubleshooting", slug: "troubleshooting" },
+            { label: "Security and trust", slug: "security" },
             { label: "Changelog", slug: "changelog" },
           ],
         },
@@ -34,6 +35,13 @@ export default defineConfig({
         {
           label: "Recipes",
           items: [{ autogenerate: { directory: "recipes" } }],
+        },
+        {
+          label: "Reference",
+          items: [
+            { label: "Error codes", slug: "reference/error-codes" },
+            { label: "SDK API reference", link: "/sororail-frontend/api/index.html" },
+          ],
         },
       ],
     }),
