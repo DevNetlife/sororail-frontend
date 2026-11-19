@@ -5,6 +5,7 @@ import {
   SigningError,
   type Payment,
   type Receipt,
+  type Signer,
 } from "@sororail/sdk";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -12,6 +13,7 @@ import { Confirm } from "@/components/Confirm";
 import { ContractLink } from "@/components/ContractLink";
 import { ErrorNotice, SuccessNotice } from "@/components/Feedback";
 import { Address, Money } from "@/components/Money";
+import { PayrollChunkProgress, type ChunkStatus } from "@/components/PayrollChunkProgress";
 import {
   BATCH_PAYOUT_CONTRACT,
   NATIVE_TOKEN,
@@ -19,11 +21,14 @@ import {
   RPC_URL,
 } from "@/lib/network";
 import {
+  mergeDuplicateRows,
   parseCsv,
   removeCsvLines,
   splitPayrollPayments,
+  type MergedAddress,
   type ParsedLine,
 } from "@/lib/payroll";
+import { usePayrollDraft } from "@/lib/payrollDraft";
 import { fetchTokenDecimals } from "@/lib/token";
 import { useWallet } from "@/lib/wallet";
 
@@ -47,6 +52,13 @@ export default function PayrollPage() {
   // this, so nothing can be sent until it is known (#138).
   const [decimals, setDecimals] = useState<number | null>(null);
   const [decimalsError, setDecimalsError] = useState<unknown>(null);
+  // What the last "Merge duplicates" combined, shown until the CSV is edited (#420).
+  const [mergeSummary, setMergeSummary] = useState<MergedAddress[] | null>(null);
+  // Per-batch status of the current run, and the run's fixed inputs so a failed
+  // batch can be retried against the same batches and source rows (#422).
+  const [chunks, setChunks] = useState<ChunkStatus[]>([]);
+  const run = useRef<{ batches: Payment[][]; sourceCsv: string; validLines: number[] } | null>(null);
+  const draft = usePayrollDraft(csv);
 
   const loadCsvFile = useCallback((file: File) => {
     setFileError(null);
@@ -61,6 +73,9 @@ export default function PayrollPage() {
       setReceipt(null);
       setPreviewError(null);
       setResults([]);
+      setMergeSummary(null);
+      run.current = null;
+      setChunks([]);
     };
     reader.onerror = () => setFileError("Could not read that file.");
     reader.readAsText(file);
@@ -234,40 +249,92 @@ export default function PayrollPage() {
       );
       return;
     }
+    run.current = { batches, sourceCsv: csv, validLines: valid.map((line) => line.line) };
+    setChunks(batches.map((chunk) => ({ count: chunk.length, state: "pending" })));
+    await runFrom(0);
+  }
+
+  function setChunk(index: number, patch: Partial<ChunkStatus>) {
+    setChunks((current) => current.map((chunk, i) => (i === index ? { ...chunk, ...patch } : chunk)));
+  }
+
+  /** Sends batches from `start` on; a retry of a failed batch resumes here (#422). */
+  async function runFrom(start: number) {
+    const current = run.current;
+    if (!current) return;
+    if (!signer || !address) {
+      setSendError(
+        new SigningError("Wallet disconnected. Reconnect to continue."),
+      );
+      return;
+    }
     setBusy(true);
     setSendError(null);
-    const sourceCsv = csv;
-    let paidCount = 0;
+    let index = start;
     try {
-      for (const chunk of batches) {
+      for (; index < current.batches.length; index++) {
+        const i = index;
+        const chunk = current.batches[i]!;
+        setChunk(i, { state: "pending", error: undefined });
+        // Reports the moment the wallet has signed, before submission and confirmation.
+        const tracked: Signer = {
+          publicKey: signer.publicKey,
+          signTransaction: async (xdr, options) => {
+            const signed = await signer.signTransaction(xdr, options);
+            setChunk(i, { state: "signed" });
+            return signed;
+          },
+        };
         const call = await client.execute({
           funder: address,
           token: NATIVE_TOKEN,
           recipients: chunk,
         });
-        const result = await call.signAndSend(signer);
-        paidCount += chunk.length;
-        setResults((current) => [
-          ...current,
+        const result = await call.signAndSend(tracked);
+        setChunk(i, { state: "confirmed", hash: result.hash });
+        const paidCount = current.batches
+          .slice(0, i + 1)
+          .reduce((count, batch) => count + batch.length, 0);
+        setResults((existing) => [
+          ...existing,
           { hash: result.hash, count: result.result.count },
         ]);
-        setCsv(
-          removeCsvLines(
-            sourceCsv,
-            valid.slice(0, paidCount).map((line) => line.line),
-          ),
-        );
+        setCsv(removeCsvLines(current.sourceCsv, current.validLines.slice(0, paidCount)));
         setReceipt(null);
       }
       setConfirming(false);
       setCsv("");
       setReceipt(null);
+      run.current = null;
+      draft.clear();
     } catch (error) {
+      setChunk(index, {
+        state: "failed",
+        error: error instanceof Error ? error.message : undefined,
+      });
       setSendError(error);
     } finally {
       setBusy(false);
     }
   }
+
+  function mergeDuplicates() {
+    const { text, merged } = mergeDuplicateRows(csv, decimals ?? undefined);
+    previewSeq.current += 1;
+    setCsv(text);
+    setReceipt(null);
+    setPreviewError(null);
+    setResults([]);
+    setMergeSummary(merged);
+  }
+
+  const progress = (
+    <PayrollChunkProgress
+      chunks={chunks}
+      busy={busy}
+      onRetry={(index) => void runFrom(index)}
+    />
+  );
 
   return (
     <div className="stack">
@@ -328,6 +395,29 @@ export default function PayrollPage() {
         </div>
         {fileError ? <p className="small text-danger m-0">{fileError}</p> : null}
 
+        {draft.savedDraft && !csv ? (
+          <div className="notice notice--info">
+            <div className="notice__title">Restore your unsent payroll?</div>
+            <div className="notice__detail">
+              A draft from an earlier visit is saved in this browser only.
+            </div>
+            <div className="row">
+              <button
+                type="button"
+                onClick={() => {
+                  setCsv(draft.savedDraft ?? "");
+                  draft.dismiss();
+                }}
+              >
+                Restore draft
+              </button>
+              <button type="button" onClick={draft.clear}>
+                Discard draft
+              </button>
+            </div>
+          </div>
+        ) : null}
+
         <label htmlFor="payroll-csv-textarea" className="sr-only">
           Payroll CSV data
         </label>
@@ -342,6 +432,9 @@ export default function PayrollPage() {
             // A new batch starts here; earlier "Paid N recipients" notices no
             // longer describe what is on screen (#137).
             setResults([]);
+            setMergeSummary(null);
+            run.current = null;
+            setChunks([]);
           }}
           placeholder={"# address,amount\nGABC…,12.50\nGDEF…,100"}
           spellCheck={false}
@@ -412,7 +505,36 @@ export default function PayrollPage() {
             <div className="notice__detail">
               That is allowed — the contract does not reject duplicates, and two
               lines for one contractor is a normal thing to want. Check it is
-              deliberate before sending.
+              deliberate before sending, or merge each address into one row.
+            </div>
+            <div className="row">
+              <button type="button" onClick={mergeDuplicates} disabled={!decimalsKnown || busy}>
+                Merge duplicates
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {mergeSummary ? (
+          <div className="notice notice--info" role="status">
+            <div className="notice__title">
+              {mergeSummary.length > 0
+                ? `Merged ${mergeSummary.length} repeated address${mergeSummary.length === 1 ? "" : "es"}`
+                : "Nothing to merge"}
+            </div>
+            <div className="notice__detail">
+              {mergeSummary.length > 0 ? (
+                <ul className="m-0">
+                  {mergeSummary.map((item) => (
+                    <li key={item.to}>
+                      <Address value={item.to} />: lines {item.lines.join(", ")} combined into one row of{" "}
+                      {item.amount}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                "Only valid rows are merged; fix the rows with errors first."
+              )}
             </div>
           </div>
         ) : null}
@@ -504,6 +626,7 @@ export default function PayrollPage() {
           </SuccessNotice>
         ) : null}
         {sendError ? <ErrorNotice error={sendError} /> : null}
+        {!confirming ? progress : null}
         {results.map((result) => (
           <SuccessNotice key={result.hash} hash={result.hash}>
             Paid {result.count} recipient{result.count === 1 ? "" : "s"}.
@@ -539,7 +662,14 @@ export default function PayrollPage() {
           }
           confirmLabel={`Pay ${valid.length}`}
           busy={busy}
-          error={sendError ? <ErrorNotice error={sendError} /> : null}
+          error={
+            sendError || chunks.length > 1 ? (
+              <>
+                {progress}
+                {sendError ? <ErrorNotice error={sendError} /> : null}
+              </>
+            ) : null
+          }
           onConfirm={() => void send()}
           onCancel={() => {
             setConfirming(false);
