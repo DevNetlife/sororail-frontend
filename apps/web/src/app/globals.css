@@ -42,6 +42,10 @@
   --radius: 6px;
   --radius-lg: 10px;
 
+  /* One focus ring for every interactive element (#406). */
+  --focus-ring: 2px solid var(--accent);
+  --focus-ring-offset: 2px;
+
   --space-xs: 0.25rem;
   --space-sm: 0.35rem;
   --space-md: 0.5rem;
@@ -340,9 +344,14 @@ h3 {
   width: 35%;
 }
 
+/* #407 — no shimmer, progress or hover motion when the user asks for less. */
 @media (prefers-reduced-motion: reduce) {
-  .skeleton-line {
-    animation: none;
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
   }
 }
 
@@ -443,9 +452,11 @@ button:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
-a:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+a:focus-visible,
+summary:focus-visible,
+[tabindex]:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
 }
 
 .button--primary {
@@ -737,6 +748,33 @@ td.numeric {
 
 .nav__spacer {
   margin-left: auto;
+}
+
+.nav__menu {
+  display: contents;
+}
+
+.nav__toggle {
+  display: none;
+}
+
+/* #405 — the link row overflows on narrow screens, so it collapses. */
+@media (max-width: 40rem) {
+  .nav__toggle {
+    display: inline-block;
+  }
+
+  .nav__menu {
+    display: none;
+    order: 1;
+    flex-basis: 100%;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .nav__menu--open {
+    display: flex;
+  }
 }
 
 /* --------------------------------------------------------------- schedule */

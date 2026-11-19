@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 
 import { NetworkBadge } from "@/components/NetworkBadge";
 import { shortAddress } from "@/lib/network";
@@ -19,13 +20,43 @@ export function Nav() {
   const pathname = usePathname();
   const { address, connect, disconnect, connecting, error, networkError, accountSwitch } =
     useWallet();
+  // #405 — below the mobile breakpoint the links collapse behind a toggle.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const toggleRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMenuOpen(false);
+        toggleRef.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [menuOpen]);
 
   return (
-    <nav className="nav">
+    <nav className="nav" aria-label="Main">
       <div className="nav__inner">
         <Link className="nav__brand" href="/">
           SoroRail
         </Link>
+        <button
+          ref={toggleRef}
+          type="button"
+          className="button--quiet nav__toggle"
+          aria-expanded={menuOpen}
+          aria-controls="nav-menu"
+          onClick={() => setMenuOpen((open) => !open)}
+        >
+          Menu
+        </button>
+        <div id="nav-menu" className={`nav__menu${menuOpen ? " nav__menu--open" : ""}`}>
         {links.map((link) => {
           const active =
             link.href === "/" ? pathname === "/" : pathname.startsWith(link.href);
@@ -40,6 +71,7 @@ export function Nav() {
             </Link>
           );
         })}
+        </div>
 
         <div className="nav__spacer" />
 
