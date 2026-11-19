@@ -53,7 +53,6 @@ jobs:
       - run: pnpm lint
       # Dead code: unused files, exports and dependencies across the workspace. Pinned to major 5.
       - run: pnpm knip
-      - run: pnpm audit
       # Playwright needs a built app and its own browser download.
       # Cache browser binaries to avoid re-downloading on every run (#111).
       - name: Get Playwright version
@@ -70,7 +69,8 @@ jobs:
       - name: Install Playwright system deps only
         if: steps.playwright-cache.outputs.cache-hit == 'true'
         run: pnpm exec playwright install-deps
-      - run: pnpm test
+      # Unit tests run in the test-shards job. Here only the Playwright suite runs.
+      - run: pnpm --filter @sororail/web exec playwright test
       # Coverage is reported once, on the newest Node version in the matrix.
       - name: SDK test coverage
         if: matrix.node-version == 22
@@ -166,3 +166,69 @@ jobs:
         env:
           WASM_DIR: ${{ github.workspace }}/contracts/target/wasm32v1-none/release
         run: pnpm test:integration
+
+  # Vitest runs in four parallel shards per package. Coverage is still produced once, by the sdk-coverage step in check.
+  test-shards:
+    name: unit tests (shard ${{ matrix.shard }}/4)
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      # apps/web imports @sororail/sdk from dist/, so build it first.
+      - run: pnpm build
+      - run: pnpm --filter @sororail/sdk exec vitest run --passWithNoTests --shard=${{ matrix.shard }}/4
+      - run: pnpm --filter @sororail/web exec vitest run --passWithNoTests --shard=${{ matrix.shard }}/4
+
+  # Lints every workflow file so a bad expression fails the PR instead of failing on execution.
+  actionlint:
+    name: actionlint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: raven-actions/actionlint@v2
+        with:
+          fail-on-error: true
+
+  # Prints the full advisory count to the job summary, then fails only on high or critical advisories.
+  # Exceptions are listed under pnpm.auditConfig.ignoreCves in package.json (see CONTRIBUTING.md).
+  audit:
+    name: pnpm audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - name: Write the advisory summary
+        run: |
+          pnpm audit --json > audit-all.json || true
+          {
+            echo "### pnpm audit"
+            echo ""
+            echo "| Severity | Count |"
+            echo "|---|---|"
+            jq -r '.metadata.vulnerabilities | to_entries[] | "| \(.key) | \(.value) |"' audit-all.json
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Fail on high or critical advisories
+        run: pnpm audit --audit-level high
+
+  # The one check to require in branch protection. It fails if any job it depends on did not succeed.
+  all-checks:
+    name: all-checks
+    if: always() && github.event_name != 'schedule'
+    needs: [check, test-shards, actionlint, audit, docs-links]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every job to succeed
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          echo "$NEEDS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          bad=$(echo "$NEEDS" | jq '[to_entries[] | select(.value.result != "success")] | length')
+          if [ "$bad" != "0" ]; then
+            echo "::error::$bad required job(s) did not succeed"
+            exit 1
+          fi
