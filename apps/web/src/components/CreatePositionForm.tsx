@@ -1,7 +1,7 @@
 "use client";
 
 import { EscrowClient, StreamClient, VestingClient } from "@sororail/sdk";
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { ErrorNotice, SuccessNotice } from "@/components/Feedback";
 import { useTokenMetadata, type TokenMetadataState } from "@/hooks/useTokenMetadata";
@@ -37,6 +37,14 @@ export function CreatePositionForm({
   const [error, setError] = useState<unknown>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [success, setSuccess] = useState<{ hash: string; saved: boolean } | null>(null);
+  // #408 — after a failed submit, focus lands on the first invalid field.
+  const formRef = useRef<HTMLFormElement>(null);
+  const [invalidSubmits, setInvalidSubmits] = useState(0);
+
+  useEffect(() => {
+    if (invalidSubmits === 0) return;
+    formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
+  }, [invalidSubmits]);
 
   // #412 — the native token is known; any other pasted contract is read for its symbol, name and decimals.
   const tokenTrimmed = token.trim();
@@ -134,6 +142,7 @@ export function CreatePositionForm({
     const validationErrors = validateFields();
     if (Object.keys(validationErrors).length > 0) {
       setFieldErrors(validationErrors);
+      setInvalidSubmits((count) => count + 1);
       return;
     }
     setFieldErrors({});
@@ -194,7 +203,7 @@ export function CreatePositionForm({
   }
 
   return (
-    <form className="card stack stack--tight" noValidate onSubmit={(event) => void submit(event)}>
+    <form ref={formRef} className="card stack stack--tight" noValidate onSubmit={(event) => void submit(event)}>
       <h3>{titles[kind]}</h3>
       <p className="small muted m-0">
         Use a fresh, uninitialized contract instance. Deploy its WASM first; this form initializes the position and adds it to this browser. Contract deployment is not available here. Amounts and stream rates use stroops.
