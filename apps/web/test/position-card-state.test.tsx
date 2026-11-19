@@ -26,7 +26,7 @@ afterEach(() => {
 });
 
 describe("PositionCardState (#290)", () => {
-  it("asks for a wallet when there is no address", () => {
+  it("renders the loaded content without a wallet (read-only, #446)", () => {
     render(
       <PositionCardState
         position={POSITION}
@@ -39,11 +39,10 @@ describe("PositionCardState (#290)", () => {
       </PositionCardState>,
     );
 
-    expect(screen.getByText("Ada's grant")).toBeInTheDocument();
+    expect(screen.getByText("loaded content")).toBeInTheDocument();
     expect(
-      screen.getByText("Connect a wallet to read this vesting."),
-    ).toBeInTheDocument();
-    expect(screen.queryByText("loaded content")).not.toBeInTheDocument();
+      screen.queryByText("Connect a wallet to read this vesting."),
+    ).not.toBeInTheDocument();
   });
 
   it("shows the load error with a working retry when one is set", async () => {

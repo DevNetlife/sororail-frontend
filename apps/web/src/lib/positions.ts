@@ -33,6 +33,33 @@ export interface Position {
   network: string;
 }
 
+/** Longest label kept, in characters (code points). Longer ones are cut (#444). */
+export const MAX_LABEL_LENGTH = 80;
+
+/**
+ * C0/C1 control characters and the Unicode bidi overrides and isolates. React
+ * escapes label text, but labels also reach `title` attributes and file names,
+ * where these can hide or reorder what the user sees.
+ */
+/** Bidi marks, embeddings, overrides and isolates, as code points so the source holds none of them literally. */
+const BIDI_CONTROLS = [0x200e, 0x200f, 0x202a, 0x202b, 0x202c, 0x202d, 0x202e, 0x2066, 0x2067, 0x2068, 0x2069];
+const UNSAFE_LABEL_CHARS = new RegExp(
+  `[\x00-\x1f\x7f-\x9f${BIDI_CONTROLS.map((cp) => String.fromCharCode(cp)).join("")}]`,
+  "g",
+);
+
+/**
+ * Cleans a user-supplied label (#444): strips control and bidi characters,
+ * collapses runs of whitespace, trims, and limits it to `MAX_LABEL_LENGTH`
+ * characters without splitting a character in two. Returns "" when nothing
+ * printable is left, so callers can fall back to the contract ID.
+ */
+export function sanitizeLabel(raw: string): string {
+  const cleaned = raw.replace(UNSAFE_LABEL_CHARS, " ").replace(/\s+/g, " ").trim();
+  const chars = Array.from(cleaned);
+  return chars.length > MAX_LABEL_LENGTH ? chars.slice(0, MAX_LABEL_LENGTH).join("").trimEnd() : cleaned;
+}
+
 const STORAGE_KEY_PREFIX = "sororail.positions";
 
 /**
@@ -279,7 +306,7 @@ export function addPosition(
     {
       kind,
       contractId: normalized,
-      label: label.trim() || normalized,
+      label: sanitizeLabel(label) || normalized,
       addedAt: Date.now(),
       network,
     },
@@ -308,7 +335,7 @@ export function restorePosition(position: Position): void {
 }
 
 export function renamePosition(contractId: string, label: string): void {
-  const trimmed = label.trim();
+  const trimmed = sanitizeLabel(label);
   if (!trimmed) return;
   const normalized = contractId.trim().toUpperCase();
   write(
@@ -366,7 +393,8 @@ export function importPositions(json: string): ImportPositionsResult {
     const key = `${p.network}::${normalizedId}`;
     if (!existingKeys.has(key)) {
       existingKeys.add(key);
-      toAdd.push({ ...p, contractId: normalizedId });
+      // Imported files are user-supplied JSON: clean the label like any other.
+      toAdd.push({ ...p, contractId: normalizedId, label: sanitizeLabel(p.label) || normalizedId });
     }
   }
 

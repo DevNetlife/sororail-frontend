@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { WalletMissingNotice } from "@/components/ReadOnly";
 import { shortAddress } from "@/lib/network";
 import { useWallet } from "@/lib/wallet";
 
@@ -68,6 +69,12 @@ export function Nav() {
           <div className="notice notice--error" role="alert">
             <div>{error.message}</div>
           </div>
+        </div>
+      ) : null}
+
+      {!address ? (
+        <div className="nav__inner nav__feedback">
+          <WalletMissingNotice />
         </div>
       ) : null}
 

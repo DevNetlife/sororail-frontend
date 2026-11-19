@@ -4,7 +4,8 @@ import type { Position } from "@/lib/positions";
 
 interface PositionCardStateProps {
   position: Position;
-  address: string | null;
+  /** Unused since #446: a position is readable without a wallet. Kept so callers need not change. */
+  address?: string | null;
   loadError: unknown;
   isLoading: boolean;
   onRetry?: () => void | Promise<void>;
@@ -14,22 +15,11 @@ interface PositionCardStateProps {
 
 export function PositionCardState({
   position,
-  address,
   loadError,
   isLoading,
   onRetry,
-  noun,
   children,
 }: PositionCardStateProps) {
-  if (!address) {
-    return (
-      <div className="card">
-        <PositionHeader position={position} />
-        <p className="small muted">Connect a wallet to read this {noun}.</p>
-      </div>
-    );
-  }
-
   if (loadError) {
     return (
       <div className="card stack stack--tight">

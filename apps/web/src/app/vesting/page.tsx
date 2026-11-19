@@ -15,6 +15,7 @@ import {
   usePositions,
 } from "@/components/PositionRegistry";
 import { PositionCardState } from "@/components/PositionCardState";
+import { ActionRow } from "@/components/ReadOnly";
 import { Schedule } from "@/components/Schedule";
 import type { Position } from "@/lib/positions";
 import { RPC_URL } from "@/lib/network";
@@ -134,14 +135,6 @@ function GrantCard({ position }: { position: Position }) {
     );
   }
 
-  if (!address) {
-    return (
-      <div className="card">
-        <PositionHeader position={position} />
-        <p className="small muted">Connect a wallet to read this grant.</p>
-      </div>
-    );
-  }
   if (loadError) {
     return (
       <div className="card stack stack--tight">
@@ -233,7 +226,7 @@ function GrantCard({ position }: { position: Position }) {
       {actionError && !pending ? <ErrorNotice error={actionError} /> : null}
 
       <div className="stack stack--tight">
-        <div className="row">
+        <ActionRow readOnly={!address}>
           <button
             type="button"
             className="button--primary"
@@ -252,7 +245,7 @@ function GrantCard({ position }: { position: Position }) {
           >
             Revoke
           </button>
-        </div>
+        </ActionRow>
         {(!isBeneficiary || beforeCliff) && (
           <div className="small muted">
             {!isBeneficiary && "Only the beneficiary can claim."}

@@ -15,6 +15,7 @@ import {
   usePositions,
 } from "@/components/PositionRegistry";
 import { PositionCardState } from "@/components/PositionCardState";
+import { ActionRow } from "@/components/ReadOnly";
 import { Schedule } from "@/components/Schedule";
 import type { Position } from "@/lib/positions";
 import { RPC_URL } from "@/lib/network";
@@ -152,15 +153,6 @@ function StreamCard({ position }: { position: Position }) {
     );
   }
 
-  if (!address) {
-    return (
-      <div className="card">
-        <PositionHeader position={position} />
-        <p className="small muted">Connect a wallet to read this stream.</p>
-      </div>
-    );
-  }
-
   if (loadError) {
     return (
       <div className="card stack stack--tight">
@@ -245,7 +237,7 @@ function StreamCard({ position }: { position: Position }) {
       {actionError && !pending ? <ErrorNotice error={actionError} /> : null}
 
       <div className="stack stack--tight">
-        <div className="row">
+        <ActionRow readOnly={!address}>
           <button
             type="button"
             className="button--primary"
@@ -280,7 +272,7 @@ function StreamCard({ position }: { position: Position }) {
           >
             Cancel stream
           </button>
-        </div>
+        </ActionRow>
         {(!isRecipient || available === null) && (
           <div className="small muted">
             {!isRecipient && "Only the recipient can withdraw from a stream."}

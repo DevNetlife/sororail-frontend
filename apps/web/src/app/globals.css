@@ -163,6 +163,14 @@ h3 {
   justify-content: flex-end;
 }
 
+/* A fieldset used only to disable a row of actions at once (#446). */
+.action-row {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
 .m-0 {
   margin: 0;
 }

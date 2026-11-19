@@ -12,6 +12,9 @@ import {
 import { NetworkError, ValidationError, decodeError } from "../errors/index.js";
 import type { Signer } from "../signers/index.js";
 
+/** The all-zero account. Valid as a simulation source; never a signer (#446). */
+const READ_ONLY_SOURCE = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
+
 /** Connection and contract details every client needs. */
 export interface ClientOptions {
   /** The deployed contract address (`C...`). */
@@ -325,15 +328,23 @@ export abstract class BaseClient {
     args: xdr.ScVal[],
     parse: (value: unknown) => T,
   ): Promise<PreparedCall<T>> {
-    const { publicKey, networkPassphrase } = this.options;
+    const { publicKey } = this.options;
     if (!publicKey) {
       throw new ValidationError(
         "This client has no publicKey, so it cannot build a transaction. Pass one when constructing the client — the signer's address is the usual choice.",
       );
     }
 
-    const source = await this.#getAccount(publicKey);
+    return this.#assemble(method, args, parse, await this.#getAccount(publicKey));
+  }
 
+  #assemble<T>(
+    method: string,
+    args: xdr.ScVal[],
+    parse: (value: unknown) => T,
+    source: Account,
+  ): PreparedCall<T> {
+    const { networkPassphrase } = this.options;
     const built = new TransactionBuilder(source, {
       fee: this.options.fee ?? BASE_FEE,
       networkPassphrase,
@@ -352,13 +363,23 @@ export abstract class BaseClient {
     });
   }
 
-  /** Builds a call and simulates it immediately. For read-only methods. */
+  /**
+   * Builds a call and simulates it immediately. For read-only methods.
+   *
+   * Without a `publicKey` the call is simulated from the null account
+   * (`GAAA…WHF`, sequence 0), as stellar-sdk's own contract client does:
+   * simulation never checks the source or its sequence, so a viewer with no
+   * wallet can still read a position. Nothing built this way can be signed
+   * or sent, and writes still require a `publicKey`.
+   */
   protected async read<T>(
     method: string,
     args: xdr.ScVal[],
     parse: (value: unknown) => T,
   ): Promise<T> {
-    const call = await this.prepare(method, args, parse);
+    const call = this.options.publicKey
+      ? await this.prepare(method, args, parse)
+      : this.#assemble(method, args, parse, new Account(READ_ONLY_SOURCE, "0"));
     return call.simulate();
   }
 }

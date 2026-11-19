@@ -78,10 +78,10 @@ describe("usePositionCard", () => {
     renderHook(() => usePositionCard(Client, position, null));
 
     expect(created[0]).not.toHaveProperty("publicKey");
-    expect(get).not.toHaveBeenCalled();
+    await waitFor(() => expect(get).toHaveBeenCalledTimes(1));
   });
 
-  it("does not read from the chain until a wallet is connected", () => {
+  it("reads from the chain without a wallet (read-only, #446)", async () => {
     const get = vi.fn(async () => ({ value: 1n }));
     const { Client } = makeClient(get);
 
@@ -89,9 +89,9 @@ describe("usePositionCard", () => {
       usePositionCard(Client, position, null),
     );
 
-    expect(get).not.toHaveBeenCalled();
-    expect(result.current.data).toBeNull();
-    expect(result.current.isLoading).toBe(true);
+    await waitFor(() => expect(result.current.data).toEqual({ value: 1n }));
+    expect(result.current.isLoading).toBe(false);
+    expect(result.current.loadError).toBeNull();
   });
 
   it("skips a position that belongs to a different network", () => {

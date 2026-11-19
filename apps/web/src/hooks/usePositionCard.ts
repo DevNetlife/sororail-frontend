@@ -36,8 +36,9 @@ export function usePositionCard<ClientType extends PositionClient>(
     [ClientConstructor, position.contractId, address],
   );
 
+  // Reads do not need a wallet (#446): without one the client simulates from
+  // the null account, so a viewer can see a position before connecting.
   const refresh = useCallback(async () => {
-    if (!address) return;
     if (position.network && position.network !== RPC_URL) return;
     const requestId = ++activeRequestIdRef.current;
     const isCurrent = () => requestId === activeRequestIdRef.current;
