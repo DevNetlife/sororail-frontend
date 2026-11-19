@@ -27,6 +27,7 @@ import { WhenLabel } from "@/components/Schedule";
 import { EscrowCountdown } from "@/components/EscrowCountdown";
 import { filterPositions } from "@/lib/position-filter";
 import type { Position } from "@/lib/positions";
+import { looksLikeContractId } from "@/lib/positions";
 import { RPC_URL } from "@/lib/network";
 import { useWallet } from "@/lib/wallet";
 import { trackSubmit } from "@/lib/session-activity";
@@ -52,6 +53,16 @@ export default function EscrowPage() {
   const allPositions = usePositions("escrow");
   const [query, setQuery] = usePositionFilter();
   const positions = filterPositions(allPositions, query);
+  const [deepLinkId, setDeepLinkId] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const add = params.get("add");
+    const kind = params.get("kind");
+    if (add && looksLikeContractId(add) && (!kind || kind === "escrow")) {
+      setDeepLinkId(add);
+    }
+  }, []);
 
   return (
     <div className="stack">
@@ -83,7 +94,7 @@ export default function EscrowPage() {
       )}
 
       <CreatePositionForm kind="escrow" />
-      <AddPositionForm kind="escrow" noun="escrow" />
+      <AddPositionForm kind="escrow" noun="escrow" initialContractId={deepLinkId} />
     </div>
   );
 }
@@ -359,7 +370,7 @@ function EscrowCard({ position }: { position: Position }) {
                 />
               ),
             },
-            { label: "Contract", value: <Address value={position.contractId} /> },
+            { label: "Contract", value: <Address value={position.contractId} explorer /> },
           ]}
           irreversible={irreversibleNote(pending, splitBps)}
           confirmLabel={confirmTitle(pending)}
