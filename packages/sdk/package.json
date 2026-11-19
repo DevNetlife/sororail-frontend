@@ -29,7 +29,7 @@
   "scripts": {
     "build": "tsup",
     "docs:api": "typedoc",
-    "lint": "tsc --noEmit",
+    "lint": "eslint src test examples",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "api:check": "node scripts/api-surface.mjs",
