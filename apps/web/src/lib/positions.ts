@@ -1,8 +1,7 @@
 "use client";
 
-import { StrKey } from "@stellar/stellar-sdk";
-
 import { RPC_URL } from "./network";
+import { isValidContractStrKey } from "./strkey";
 
 /**
  * The registry of contract instances this browser knows about.
@@ -406,5 +405,5 @@ export function importPositions(json: string): ImportPositionsResult {
 /** A contract address is a 56-character `C…` strkey. */
 export function looksLikeContractId(value: string): boolean {
   const trimmed = value.trim().toUpperCase();
-  return StrKey.isValidContract(trimmed);
+  return isValidContractStrKey(trimmed);
 }

@@ -1,0 +1,5 @@
+# Review routing. Owners are requested automatically on pull requests that touch these paths.
+# Confirm the team handles below exist in the Sororail org before merging.
+/packages/sdk/  @Sororail/sdk-maintainers
+/apps/web/      @Sororail/web-maintainers
+/apps/docs/     @Sororail/docs-maintainers
