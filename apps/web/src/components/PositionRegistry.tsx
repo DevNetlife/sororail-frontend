@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { ContractLink } from "@/components/ContractLink";
+import { Address } from "@/components/Money";
 import { useToast } from "@/hooks/useToast";
 import {
   addPosition,
@@ -94,13 +95,20 @@ export function usePositionPolling(refresh: () => void | Promise<void>) {
 export function AddPositionForm({
   kind,
   noun,
+  initialContractId,
 }: {
   kind: PositionKind;
   noun: string;
+  /** Pre-fills the contract address field, e.g. from a deep-link `?add=` param. */
+  initialContractId?: string;
 }) {
-  const [contractId, setContractId] = useState("");
+  const [contractId, setContractId] = useState(initialContractId ?? "");
   const [label, setLabel] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (initialContractId) setContractId(initialContractId);
+  }, [initialContractId]);
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -244,9 +252,7 @@ export function PositionHeader({ position }: { position: Position }) {
             </button>
           </h3>
         )}
-        <ContractLink className="addr" id={position.contractId}>
-          {position.contractId}
-        </ContractLink>
+        <Address value={position.contractId} explorer />
       </div>
       <button
         type="button"
