@@ -7,8 +7,10 @@ import { Confirm } from "@/components/Confirm";
 import { ErrorNotice, SuccessNotice } from "@/components/Feedback";
 import { Address, Money } from "@/components/Money";
 import { usePositionPolling } from "@/components/PositionRegistry";
+import { PositionDetails, PositionRefresh } from "@/components/PositionCardTools";
 import { Figure, PositionCardShell } from "@/components/PositionCardShell";
 import { Schedule } from "@/components/Schedule";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { usePositionCard } from "@/hooks/usePositionCard";
 import type { Position } from "@/lib/positions";
 import { useWallet } from "@/lib/wallet";
@@ -17,13 +19,11 @@ import { useWallet } from "@/lib/wallet";
 export function GrantCard({ position }: { position: Position }) {
   const { address, signer } = useWallet();
   const [claimable, setClaimable] = useState<bigint | null>(null);
-  const [actionError, setActionError] = useState<unknown>(null);
   const [pending, setPending] = useState<"claim" | "revoke" | null>(null);
-  const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<{ text: string; hash: string } | null>(null);
   const [now, setNow] = useState<bigint>(() => BigInt(Math.floor(Date.now() / 1000)));
 
-  const { data: grant, loadError, client, refresh, isLoading } = usePositionCard(
+  const { data: grant, loadError, client, refresh, isLoading, isRefreshing, lastUpdatedAt } = usePositionCard(
     VestingClient,
     position,
     address,
@@ -53,33 +53,27 @@ export function GrantCard({ position }: { position: Position }) {
     return () => clearInterval(id);
   }, []);
 
-  async function run(action: "claim" | "revoke") {
+  const {
+    run,
+    busy,
+    error: actionError,
+    reset: clearActionError,
+  } = useAsyncAction(async (action: "claim" | "revoke") => {
     if (!signer) {
-      setActionError(
-        new SigningError("Wallet disconnected. Reconnect to continue."),
-      );
-      return;
+      throw new SigningError("Wallet disconnected. Reconnect to continue.");
     }
-    setBusy(true);
-    setActionError(null);
-    try {
-      const call = action === "claim" ? await client.claim() : await client.revoke();
-      const sent = await call.signAndSend(signer);
-      setDone({
-        text:
-          action === "claim"
-            ? "Claimed vested tokens."
-            : "Grant revoked. The vested portion stays claimable.",
-        hash: sent.hash,
-      });
-      setPending(null);
-      await refresh();
-    } catch (error) {
-      setActionError(error);
-    } finally {
-      setBusy(false);
-    }
-  }
+    const call = action === "claim" ? await client.claim() : await client.revoke();
+    const sent = await call.signAndSend(signer);
+    setDone({
+      text:
+        action === "claim"
+          ? "Claimed vested tokens."
+          : "Grant revoked. The vested portion stays claimable.",
+      hash: sent.hash,
+    });
+    setPending(null);
+    await refresh();
+  });
 
   return (
     <PositionCardShell
@@ -100,6 +94,9 @@ export function GrantCard({ position }: { position: Position }) {
         const beforeCliff = now < cliffAt;
         return (
           <>
+            <PositionRefresh onRefresh={refresh} isRefreshing={isRefreshing} lastUpdatedAt={lastUpdatedAt} />
+            <PositionDetails kind="vesting" data={g} />
+
             <div className="row">
               {g.revokedAt ? (
                 <span className="pill pill--done">Revoked</span>
@@ -213,7 +210,7 @@ export function GrantCard({ position }: { position: Position }) {
                 onConfirm={() => void run("claim")}
                 onCancel={() => {
                   setPending(null);
-                  setActionError(null);
+                  clearActionError();
                 }}
               />
             ) : null}
@@ -242,7 +239,7 @@ export function GrantCard({ position }: { position: Position }) {
                 onConfirm={() => void run("revoke")}
                 onCancel={() => {
                   setPending(null);
-                  setActionError(null);
+                  clearActionError();
                 }}
               />
             ) : null}

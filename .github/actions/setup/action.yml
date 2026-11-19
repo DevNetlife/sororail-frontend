@@ -3,15 +3,23 @@ description: Install pnpm, Node.js and the workspace dependencies. Run actions/c
 
 inputs:
   node-version:
-    description: Node.js version to install.
+    description: Node.js version to install. Leave empty to read the version from .nvmrc.
     required: false
-    default: "22"
+    default: ""
 
 runs:
   using: composite
   steps:
     - uses: pnpm/action-setup@v4
-    - uses: actions/setup-node@v4
+    - name: Set up Node.js from .nvmrc
+      if: inputs.node-version == ''
+      uses: actions/setup-node@v4
+      with:
+        node-version-file: .nvmrc
+        cache: pnpm
+    - name: Set up Node.js ${{ inputs.node-version }}
+      if: inputs.node-version != ''
+      uses: actions/setup-node@v4
       with:
         node-version: ${{ inputs.node-version }}
         cache: pnpm

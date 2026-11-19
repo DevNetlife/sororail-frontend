@@ -3,12 +3,14 @@
 import { ErrorNotice, SuccessNotice } from "@/components/Feedback";
 import { Money } from "@/components/Money";
 import { PayrollChunkProgress } from "@/components/PayrollChunkProgress";
+import { PayrollFee } from "@/components/PayrollFee";
 import type { PayrollState } from "@/hooks/usePayroll";
 
 type ResultsProps = Pick<
   PayrollState,
   | "previewError"
   | "receipt"
+  | "feeEstimate"
   | "batches"
   | "decimals"
   | "sendError"
@@ -23,6 +25,7 @@ type ResultsProps = Pick<
 export function PayrollResults({
   previewError,
   receipt,
+  feeEstimate,
   batches,
   decimals,
   sendError,
@@ -42,6 +45,7 @@ export function PayrollResults({
           <Money value={receipt.total} decimals={decimals ?? undefined} /> total. Nothing has been sent.
         </SuccessNotice>
       ) : null}
+      {receipt && feeEstimate ? <PayrollFee estimate={feeEstimate} /> : null}
       {sendError ? <ErrorNotice error={sendError} /> : null}
       {!confirming ? (
         <PayrollChunkProgress chunks={chunks} busy={busy} onRetry={(index) => void retryFrom(index)} />

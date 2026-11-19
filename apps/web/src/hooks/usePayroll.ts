@@ -10,12 +10,8 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { ChunkStatus } from "@/components/PayrollChunkProgress";
-import {
-  BATCH_PAYOUT_CONTRACT,
-  NATIVE_TOKEN,
-  NETWORK_PASSPHRASE,
-  RPC_URL,
-} from "@/lib/network";
+import { BATCH_PAYOUT_CONTRACT, NATIVE_TOKEN } from "@/lib/network";
+import { useRpc } from "@/lib/rpc-provider";
 import {
   buildPayrollTemplate,
   mergeDuplicateRows,
@@ -26,6 +22,7 @@ import {
 } from "@/lib/payroll";
 import { usePayrollDraft } from "@/lib/payrollDraft";
 import type { AddressBookEntry } from "@/lib/addressBook";
+import { estimatePayrollFee, type PayrollFeeEstimate } from "@/lib/payroll-fee";
 import { fetchTokenDecimals } from "@/lib/token";
 import { useWallet } from "@/lib/wallet";
 
@@ -39,10 +36,16 @@ export const MAX_VISIBLE_VALID_ROWS = 200;
  */
 export function usePayroll() {
   const { address, signer, connect } = useWallet();
+  const { clientOptions } = useRpc();
   const [csv, setCsv] = useState("");
   const [cap, setCap] = useState<number | null>(null);
   const [capError, setCapError] = useState<unknown>(null);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
+  const [feeEstimate, setFeeEstimate] = useState<PayrollFeeEstimate | null>(null);
+  // The fee estimate belongs to the preview it was computed with.
+  useEffect(() => {
+    if (!receipt) setFeeEstimate(null);
+  }, [receipt]);
   const [previewError, setPreviewError] = useState<unknown>(null);
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -114,14 +117,8 @@ export function usePayroll() {
   }, []);
 
   const client = useMemo(
-    () =>
-      new BatchPayoutClient({
-        contractId: BATCH_PAYOUT_CONTRACT,
-        rpcUrl: RPC_URL,
-        networkPassphrase: NETWORK_PASSPHRASE,
-        ...(address ? { publicKey: address } : {}),
-      }),
-    [address],
+    () => new BatchPayoutClient(clientOptions(BATCH_PAYOUT_CONTRACT, address)),
+    [clientOptions, address],
   );
 
   // Read the cap rather than hardcoding: it is derived from network resource
@@ -252,7 +249,15 @@ export function usePayroll() {
       for (const chunk of batches) {
         receipts.push(await client.preview(chunk));
       }
+      // Each chunk is its own transaction: total their simulated fees (#424).
+      const fee = address
+        ? await estimatePayrollFee(batches, async (chunk) => {
+            const call = await client.execute({ funder: address, token: NATIVE_TOKEN, recipients: chunk });
+            return (await call.simulateWithResources()).resources.resourceFee;
+          })
+        : null;
       if (seq === previewSeq.current) {
+        setFeeEstimate(fee);
         setReceipt({
           count: receipts.reduce((count, res) => count + res.count, 0),
           total: receipts.reduce((sum, res) => sum + res.total, 0n),
@@ -263,7 +268,7 @@ export function usePayroll() {
         setPreviewError(error);
       }
     }
-  }, [batches, client]);
+  }, [batches, client, address]);
 
   async function send() {
     if (!signer || !address) {
@@ -393,6 +398,7 @@ export function usePayroll() {
     payments,
     batches,
     receipt,
+    feeEstimate,
     previewError,
     preview,
     confirming,

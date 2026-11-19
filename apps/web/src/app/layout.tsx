@@ -4,6 +4,7 @@ import { GeistSans } from "geist/font/sans";
 
 import { Nav } from "@/components/Nav";
 import { NetworkGuard } from "@/components/NetworkGuard";
+import { RpcProvider } from "@/lib/rpc-provider";
 import { WalletProvider } from "@/lib/wallet";
 
 import "./globals.css";
@@ -18,6 +19,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={GeistSans.variable}>
       <body>
+        <RpcProvider>
         <WalletProvider>
           <NetworkGuard>
           <a href="#main-content" className="skip-link">
@@ -36,6 +38,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <main id="main-content" className="shell">{children}</main>
           </NetworkGuard>
         </WalletProvider>
+        </RpcProvider>
       </body>
     </html>
   );
