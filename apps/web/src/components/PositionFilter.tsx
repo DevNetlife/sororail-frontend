@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 import { POSITION_FILTER_PARAM } from "@/lib/position-filter";
 
@@ -27,18 +27,24 @@ export function usePositionFilter(): [string, (value: string) => void] {
   return [query, setQuery];
 }
 
+/**
+ * `children` renders further filter dimensions (e.g. the status control, #428)
+ * inside the same filter block, so a list page has one filter UI, not two.
+ */
 export function PositionFilter({
   noun,
   query,
   onChange,
   shown,
   total,
+  children,
 }: {
   noun: string;
   query: string;
   onChange: (value: string) => void;
   shown: number;
   total: number;
+  children?: ReactNode;
 }) {
   const id = `position-filter-${noun}`;
   return (
@@ -66,6 +72,7 @@ export function PositionFilter({
           Showing {shown} of {total}
         </p>
       ) : null}
+      {children}
     </div>
   );
 }

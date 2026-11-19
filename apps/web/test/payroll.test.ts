@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  decimalPlaces,
+  mergeDuplicateRows,
   parseCsv,
   removeCsvLines,
   splitCsvLine,
@@ -286,5 +288,55 @@ describe("splitPayrollPayments", () => {
       payments.slice(0, 2),
       payments.slice(2),
     ]);
+  });
+});
+
+describe("decimal precision per row (#423)", () => {
+  it("counts significant decimal places, ignoring trailing zeros", () => {
+    expect(decimalPlaces("10")).toBe(0);
+    expect(decimalPlaces("1.50")).toBe(1);
+    expect(decimalPlaces("1,234.5678")).toBe(4);
+  });
+
+  it("names the token's limit when an 8-decimal value meets a 7-decimal token", () => {
+    const [row] = parseCsv(`${VALID_ADDR},1.12345678`, 7);
+    expect(row!.error).toBe("Amount has too many decimal places (maximum 7).");
+    expect(row!.stroops).toBeUndefined();
+  });
+
+  it("accepts a value at exactly the token's precision, and trailing zeros beyond it", () => {
+    expect(parseCsv(`${VALID_ADDR},1.1234567`, 7)[0]!.error).toBeUndefined();
+    expect(parseCsv(`${VALID_ADDR},1.12345670`, 7)[0]!.error).toBeUndefined();
+  });
+
+  it("uses the token's own decimals, not 7", () => {
+    expect(parseCsv(`${VALID_ADDR},1.123`, 2)[0]!.error).toBe(
+      "Amount has too many decimal places (maximum 2).",
+    );
+  });
+});
+
+describe("mergeDuplicateRows (#420)", () => {
+  const OTHER = "GCKFBEIYTKP5RDBQMUQ5G5NB5Z7F6T5XHKXVZX4MKZVNQPRJVKQKJT3L";
+
+  it("sums three rows where two share an address into the first occurrence", () => {
+    const csv = `${VALID_ADDR},10\n${OTHER},5\n${VALID_ADDR},2.5`;
+    const { text, merged } = mergeDuplicateRows(csv, 7);
+    expect(text).toBe(`${VALID_ADDR},12.5\n${OTHER},5`);
+    expect(merged).toEqual([{ to: VALID_ADDR, lines: [1, 3], amount: "12.5" }]);
+    const parsed = parseCsv(text, 7);
+    expect(parsed.map((row) => row.stroops)).toEqual([125_000_000n, 50_000_000n]);
+  });
+
+  it("leaves comments, blank lines and rows with errors untouched", () => {
+    const csv = `# header\n${VALID_ADDR},1\n\n${VALID_ADDR},abc\n${VALID_ADDR},2`;
+    const { text, merged } = mergeDuplicateRows(csv, 7);
+    expect(text).toBe(`# header\n${VALID_ADDR},3\n\n${VALID_ADDR},abc`);
+    expect(merged).toEqual([{ to: VALID_ADDR, lines: [2, 5], amount: "3" }]);
+  });
+
+  it("returns the text unchanged when nothing repeats", () => {
+    const csv = `${VALID_ADDR},1\n${OTHER},2`;
+    expect(mergeDuplicateRows(csv, 7)).toEqual({ text: csv, merged: [] });
   });
 });

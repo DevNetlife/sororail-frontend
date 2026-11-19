@@ -40,6 +40,12 @@ interface WalletState {
    * network to switch to. Signing is refused until it clears.
    */
   networkError: string | null;
+  /**
+   * Set when Freighter's active account changed under a connected session (#430). The old signer is dropped at that
+   * moment, so nothing is ever signed by an account the user did not knowingly pick, and every per-account read
+   * (keyed by `address`) resets. `connect()` continues as the new account and clears it.
+   */
+  accountSwitch: { previous: string; current: string } | null;
   connect: () => Promise<void>;
   disconnect: () => void;
 }
@@ -98,6 +104,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [networkError, setNetworkError] = useState<string | null>(null);
+  const [accountSwitch, setAccountSwitch] = useState<WalletState["accountSwitch"]>(null);
   /**
    * Set when the user explicitly disconnects, to stop the restore effect below
    * immediately reconnecting them. Without it, Disconnect would appear to do
@@ -131,6 +138,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     try {
       const connected = await connectSigner();
       setSigner(connected);
+      setAccountSwitch(null);
     } catch (cause) {
       setError(
         cause instanceof Error
@@ -192,8 +200,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
    * `FreighterSigner` resolves its address once, at connect. Without this, a
    * switch in Freighter left `address` — and every role check derived from it
    * — on the old account until a manual disconnect and reconnect. When the
-   * active account changes, the signer is replaced by a fresh one for the new
-   * account; when the network stops matching, `networkError` says so.
+   * active account changes, the signer is dropped and `accountSwitch` records
+   * the change, so the user sees a notice and reconnects as the new account
+   * with one click instead of signing with an address they did not expect
+   * (#430); when the network stops matching, `networkError` says so.
    */
   useEffect(() => {
     if (!signer) {
@@ -210,10 +220,9 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         ]);
         if (cancelled) return;
         setNetworkError(mismatch);
-        if (active !== signer.publicKey) {
-          const { FreighterSigner } = await import("@sororail/sdk");
-          const switched = await FreighterSigner.connect();
-          if (!cancelled) setSigner(switched);
+        if (active && active !== signer.publicKey) {
+          setAccountSwitch({ previous: signer.publicKey, current: active });
+          setSigner(null);
         }
       } catch {
         /* Locked or revoked mid-session. Signing will say so; keep state. */
@@ -238,6 +247,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     // until the user revokes it there, which is the extension's call to make.
     setSigner(null);
     setError(null);
+    setAccountSwitch(null);
     writeDisconnected(true);
     setDisconnected(true);
   }, []);
@@ -249,10 +259,11 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       connecting,
       error,
       networkError,
+      accountSwitch,
       connect,
       disconnect,
     }),
-    [signer, connecting, error, networkError, connect, disconnect],
+    [signer, connecting, error, networkError, accountSwitch, connect, disconnect],
   );
 
   return (

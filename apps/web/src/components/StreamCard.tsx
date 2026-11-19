@@ -13,11 +13,20 @@ import { ActionRow } from "@/components/ReadOnly";
 import { Schedule } from "@/components/Schedule";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { usePositionCard } from "@/hooks/usePositionCard";
+import { streamStatus, type PositionStatus } from "@/lib/position-status";
 import type { Position } from "@/lib/positions";
 import { useWallet } from "@/lib/wallet";
 
 /** One tracked stream: schedule, balances and its actions (moved from `streams/page.tsx`, #439). */
-export function StreamCard({ position }: { position: Position }) {
+export function StreamCard({
+  position,
+  onStatus,
+  hidden = false,
+}: {
+  position: Position;
+  onStatus?: (contractId: string, status: PositionStatus) => void;
+  hidden?: boolean;
+}) {
   const { address, signer } = useWallet();
   const [available, setAvailable] = useState<bigint | null>(null);
   const [pending, setPending] = useState<"withdraw" | "cancel" | "topUp" | "extend" | null>(null);
@@ -42,6 +51,11 @@ export function StreamCard({ position }: { position: Position }) {
 
   useEffect(() => { void refresh(); }, [refresh]);
   usePositionPolling(refresh);
+
+  const status = stream ? streamStatus(stream, now) : undefined;
+  useEffect(() => {
+    if (status && onStatus) onStatus(position.contractId, status);
+  }, [status, onStatus, position.contractId]);
 
   // Keep the clock moving so the schedule and accrual stay honest on screen.
   useEffect(() => {
@@ -85,6 +99,8 @@ export function StreamCard({ position }: { position: Position }) {
     setExtendDate("");
     await refresh();
   });
+
+  if (hidden) return null;
 
   return (
     <PositionCardShell

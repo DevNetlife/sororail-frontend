@@ -7,13 +7,16 @@ import { CreatePositionForm } from "@/components/CreatePositionForm";
 import { EmptyState } from "@/components/Feedback";
 import { AddPositionForm, usePositions } from "@/components/PositionRegistry";
 import { PositionFilter, usePositionFilter } from "@/components/PositionFilter";
+import { StatusFilter, useStatusFilter } from "@/components/StatusFilter";
 import { StreamCard } from "@/components/StreamCard";
 import { filterPositions } from "@/lib/position-filter";
+import { isVisible } from "@/lib/position-status";
 
 export default function StreamsPage() {
   const allPositions = usePositions("stream");
   const [query, setQuery] = usePositionFilter();
   const positions = filterPositions(allPositions, query);
+  const { filter, setFilter, statuses, report } = useStatusFilter();
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => setHydrated(true), []);
@@ -42,13 +45,22 @@ export default function StreamsPage() {
         </div>
       ) : (
         <>
-          <PositionFilter noun="stream" query={query} onChange={setQuery} shown={positions.length} total={allPositions.length} />
+          <PositionFilter noun="stream" query={query} onChange={setQuery} shown={positions.length} total={allPositions.length}>
+            <StatusFilter value={filter} onChange={setFilter} statuses={statuses} label="Filter streams by status" />
+          </PositionFilter>
           {positions.length === 0 ? (
             <div className="card">
               <EmptyState title="No streams match">Try a different name or address, or clear the search.</EmptyState>
             </div>
           ) : (
-            positions.map((position) => <StreamCard key={position.contractId} position={position} />)
+            positions.map((position) => (
+              <StreamCard
+                key={position.contractId}
+                position={position}
+                onStatus={report}
+                hidden={!isVisible(statuses[position.contractId], filter)}
+              />
+            ))
           )}
         </>
       )}

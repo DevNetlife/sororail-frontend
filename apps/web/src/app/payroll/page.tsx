@@ -5,6 +5,7 @@ import { Confirm } from "@/components/Confirm";
 import { ContractLink } from "@/components/ContractLink";
 import { ErrorNotice } from "@/components/Feedback";
 import { Money } from "@/components/Money";
+import { PayrollChunkProgress } from "@/components/PayrollChunkProgress";
 import { PayrollPreview } from "@/components/PayrollPreview";
 import { PayrollResults } from "@/components/PayrollResults";
 import { usePayroll } from "@/hooks/usePayroll";
@@ -38,6 +39,10 @@ export default function PayrollPage() {
     sendError,
     setSendError,
     send,
+    chunks,
+    retryFrom,
+    draft,
+    restoreDraft,
   } = payroll;
 
   return (
@@ -103,6 +108,23 @@ export default function PayrollPage() {
           />
         </div>
         {fileError ? <p className="small text-danger m-0">{fileError}</p> : null}
+
+        {draft.savedDraft && !csv ? (
+          <div className="notice notice--info">
+            <div className="notice__title">Restore your unsent payroll?</div>
+            <div className="notice__detail">
+              A draft from an earlier visit is saved in this browser only.
+            </div>
+            <div className="row">
+              <button type="button" onClick={restoreDraft}>
+                Restore draft
+              </button>
+              <button type="button" onClick={draft.clear}>
+                Discard draft
+              </button>
+            </div>
+          </div>
+        ) : null}
 
         <label htmlFor="payroll-csv-textarea" className="sr-only">
           Payroll CSV data
@@ -176,7 +198,14 @@ export default function PayrollPage() {
           }
           confirmLabel={`Pay ${valid.length}`}
           busy={busy}
-          error={sendError ? <ErrorNotice error={sendError} /> : null}
+          error={
+            sendError || chunks.length > 1 ? (
+              <>
+                <PayrollChunkProgress chunks={chunks} busy={busy} onRetry={(index) => void retryFrom(index)} />
+                {sendError ? <ErrorNotice error={sendError} /> : null}
+              </>
+            ) : null
+          }
           onConfirm={() => void send()}
           onCancel={() => {
             setConfirming(false);
