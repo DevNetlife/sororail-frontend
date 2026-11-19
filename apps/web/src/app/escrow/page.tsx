@@ -20,8 +20,11 @@ import {
   usePositions,
 } from "@/components/PositionRegistry";
 import { PositionCardState } from "@/components/PositionCardState";
+import { PositionDetails, PositionRefresh } from "@/components/PositionCardTools";
+import { PositionFilter, usePositionFilter } from "@/components/PositionFilter";
 import { ActionRow } from "@/components/ReadOnly";
 import { WhenLabel } from "@/components/Schedule";
+import { filterPositions } from "@/lib/position-filter";
 import type { Position } from "@/lib/positions";
 import { RPC_URL } from "@/lib/network";
 import { useWallet } from "@/lib/wallet";
@@ -30,7 +33,9 @@ import { usePositionCard } from "@/hooks/usePositionCard";
 type Action = "fund" | "release" | "refund" | "dispute" | "resolve";
 
 export default function EscrowPage() {
-  const positions = usePositions("escrow");
+  const allPositions = usePositions("escrow");
+  const [query, setQuery] = usePositionFilter();
+  const positions = filterPositions(allPositions, query);
 
   return (
     <div className="stack">
@@ -42,16 +47,23 @@ export default function EscrowPage() {
         </p>
       </div>
 
-      {positions.length === 0 ? (
+      {allPositions.length === 0 ? (
         <div className="card">
           <EmptyState title="No escrows tracked yet">
             Initialize a deployed escrow contract below, or track one that already exists.
           </EmptyState>
         </div>
       ) : (
-        positions.map((position) => (
-          <EscrowCard key={position.contractId} position={position} />
-        ))
+        <>
+          <PositionFilter noun="escrow" query={query} onChange={setQuery} shown={positions.length} total={allPositions.length} />
+          {positions.length === 0 ? (
+            <div className="card">
+              <EmptyState title="No escrows match">Try a different name or address, or clear the search.</EmptyState>
+            </div>
+          ) : (
+            positions.map((position) => <EscrowCard key={position.contractId} position={position} />)
+          )}
+        </>
       )}
 
       <CreatePositionForm kind="escrow" />
@@ -69,7 +81,7 @@ function EscrowCard({ position }: { position: Position }) {
   const [now, setNow] = useState<bigint>(() => BigInt(Math.floor(Date.now() / 1000)));
   const [splitBps, setSplitBps] = useState(5000);
 
-  const { data: escrow, loadError, client, refresh, isLoading } = usePositionCard(
+  const { data: escrow, loadError, client, refresh, isLoading, isRefreshing, lastUpdatedAt } = usePositionCard(
     EscrowClient,
     position,
     address,
@@ -152,6 +164,8 @@ function EscrowCard({ position }: { position: Position }) {
   return (
     <div className="card stack stack--tight">
       <PositionHeader position={position} />
+      <PositionRefresh onRefresh={refresh} isRefreshing={isRefreshing} lastUpdatedAt={lastUpdatedAt} />
+      <PositionDetails kind="escrow" data={escrow} />
 
       <div className="row">
         <span className={`pill ${closed ? "pill--done" : "pill--active"}`}>

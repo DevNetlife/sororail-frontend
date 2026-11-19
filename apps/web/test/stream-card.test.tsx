@@ -79,6 +79,7 @@ describe("StreamCard (#439)", () => {
     expect(screen.getByText("Streaming")).toBeInTheDocument();
     expect(screen.getByText(READ_ONLY_REASON)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Withdraw" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Refresh" })).toBeEnabled();
   });
 
   it("refuses a position from a different network", () => {

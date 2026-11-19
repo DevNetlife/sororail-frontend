@@ -251,3 +251,41 @@ describe("usePositionCard error state", () => {
     expect(result.current.isLoading).toBe(false);
   });
 });
+
+describe("usePositionCard client memoisation (#442)", () => {
+  it("keeps the same client across re-renders with the same contract, signer and network", async () => {
+    const get = vi.fn(async () => null);
+    const { Client, created } = makeClient(get);
+    let renders = 0;
+
+    const { result, rerender } = renderHook(() => {
+      renders += 1;
+      return usePositionCard(Client, position, ADDRESS);
+    });
+    const first = result.current.client;
+    rerender();
+    rerender();
+    await waitFor(() => expect(get).toHaveBeenCalled());
+
+    expect(renders).toBeGreaterThanOrEqual(3);
+    expect(result.current.client).toBe(first);
+    expect(created).toHaveLength(1);
+  });
+
+  it("builds a new client when the signer changes", async () => {
+    const get = vi.fn(async () => null);
+    const { Client, created } = makeClient(get);
+    const OTHER = "GBZXN7PIRZGNMHGA7MUUUF4GWPY5AYPV6LY4UV2GL6VJGIQRXFDNMADI";
+
+    const { result, rerender } = renderHook(
+      ({ address }: { address: string }) => usePositionCard(Client, position, address),
+      { initialProps: { address: ADDRESS } },
+    );
+    const first = result.current.client;
+    rerender({ address: OTHER });
+
+    expect(result.current.client).not.toBe(first);
+    expect(created).toHaveLength(2);
+    expect(created[1]).toMatchObject({ publicKey: OTHER });
+  });
+});

@@ -3,10 +3,14 @@
 import { CreatePositionForm } from "@/components/CreatePositionForm";
 import { EmptyState } from "@/components/Feedback";
 import { GrantCard } from "@/components/GrantCard";
+import { filterPositions } from "@/lib/position-filter";
 import { AddPositionForm, usePositions } from "@/components/PositionRegistry";
+import { PositionFilter, usePositionFilter } from "@/components/PositionFilter";
 
 export default function VestingPage() {
-  const positions = usePositions("vesting");
+  const allPositions = usePositions("vesting");
+  const [query, setQuery] = usePositionFilter();
+  const positions = filterPositions(allPositions, query);
 
   return (
     <div className="stack">
@@ -18,16 +22,23 @@ export default function VestingPage() {
         </p>
       </div>
 
-      {positions.length === 0 ? (
+      {allPositions.length === 0 ? (
         <div className="card">
           <EmptyState title="No grants tracked yet">
             Initialize a deployed vesting contract below, or track one that already exists.
           </EmptyState>
         </div>
       ) : (
-        positions.map((position) => (
-          <GrantCard key={position.contractId} position={position} />
-        ))
+        <>
+          <PositionFilter noun="grant" query={query} onChange={setQuery} shown={positions.length} total={allPositions.length} />
+          {positions.length === 0 ? (
+            <div className="card">
+              <EmptyState title="No grants match">Try a different name or address, or clear the search.</EmptyState>
+            </div>
+          ) : (
+            positions.map((position) => <GrantCard key={position.contractId} position={position} />)
+          )}
+        </>
       )}
 
       <CreatePositionForm kind="vesting" />

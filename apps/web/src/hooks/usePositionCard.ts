@@ -1,13 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Position } from "@/lib/positions";
-import { NETWORK_PASSPHRASE, RPC_URL } from "@/lib/network";
-
-interface ClientOptions {
-  contractId: string;
-  rpcUrl: string;
-  networkPassphrase: string;
-  publicKey?: string;
-}
+import { RPC_URL } from "@/lib/network";
+import type { ContractClientOptions as ClientOptions } from "@/lib/rpc";
+import { useRpc } from "@/lib/rpc-provider";
 
 interface PositionClient {
   get(): Promise<unknown>;
@@ -23,17 +18,18 @@ export function usePositionCard<ClientType extends PositionClient>(
   const [data, setData] = useState<DataType | null>(null);
   const [loadError, setLoadError] = useState<unknown>(null);
   const [isLoading, setIsLoading] = useState(true);
+  // When the data was last read from the chain, and whether a read is in flight (#426).
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const activeRequestIdRef = useRef(0);
 
+  const { clientOptions } = useRpc();
+  // Memoised by contract id, signer and network (the provider's RPC), so the
+  // client keeps its identity across re-renders and its caches and effects
+  // are not reset on every render (#442).
   const client = useMemo(
-    () =>
-      new ClientConstructor({
-        contractId: position.contractId,
-        rpcUrl: RPC_URL,
-        networkPassphrase: NETWORK_PASSPHRASE,
-        ...(address ? { publicKey: address } : {}),
-      }),
-    [ClientConstructor, position.contractId, address],
+    () => new ClientConstructor(clientOptions(position.contractId, address)),
+    [ClientConstructor, clientOptions, position.contractId, address],
   );
 
   // Reads do not need a wallet (#446): without one the client simulates from
@@ -42,11 +38,13 @@ export function usePositionCard<ClientType extends PositionClient>(
     if (position.network && position.network !== RPC_URL) return;
     const requestId = ++activeRequestIdRef.current;
     const isCurrent = () => requestId === activeRequestIdRef.current;
+    setIsRefreshing(true);
     try {
       const result = (await client.get()) as DataType;
       if (!isCurrent()) return;
       setData(result);
       setLoadError(null);
+      setLastUpdatedAt(Date.now());
       if (onRefresh) {
         await onRefresh(client, isCurrent);
       }
@@ -54,7 +52,10 @@ export function usePositionCard<ClientType extends PositionClient>(
       if (!isCurrent()) return;
       setLoadError(error);
     } finally {
-      if (isCurrent()) setIsLoading(false);
+      if (isCurrent()) {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
     }
   }, [client, address, position.network, onRefresh]);
 
@@ -65,5 +66,5 @@ export function usePositionCard<ClientType extends PositionClient>(
     };
   }, [refresh]);
 
-  return { data, loadError, client, refresh, isLoading };
+  return { data, loadError, client, refresh, isLoading, isRefreshing, lastUpdatedAt };
 }

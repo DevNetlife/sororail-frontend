@@ -84,6 +84,7 @@ describe("GrantCard (#439)", () => {
     expect(screen.getByText("Before cliff")).toBeInTheDocument();
     expect(screen.getByText(READ_ONLY_REASON)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Claim" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Refresh" })).toBeEnabled();
   });
 
   it("refuses a position from a different network", () => {

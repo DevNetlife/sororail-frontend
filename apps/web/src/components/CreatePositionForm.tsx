@@ -4,8 +4,9 @@ import { EscrowClient, StreamClient, VestingClient } from "@sororail/sdk";
 import { useState, type FormEvent } from "react";
 
 import { ErrorNotice, SuccessNotice } from "@/components/Feedback";
-import { NETWORK_PASSPHRASE, NATIVE_TOKEN, RPC_URL } from "@/lib/network";
+import { NATIVE_TOKEN } from "@/lib/network";
 import { addPosition, looksLikeContractId, type PositionKind } from "@/lib/positions";
+import { useRpc } from "@/lib/rpc-provider";
 import { useWallet } from "@/lib/wallet";
 
 const titles: Record<Exclude<PositionKind, "recurring">, string> = {
@@ -20,6 +21,7 @@ export function CreatePositionForm({
   kind: Exclude<PositionKind, "recurring">;
 }) {
   const { address, signer } = useWallet();
+  const { clientOptions } = useRpc();
   const [contractId, setContractId] = useState("");
   const [counterparty, setCounterparty] = useState("");
   const [arbiter, setArbiter] = useState("");
@@ -125,12 +127,7 @@ export function CreatePositionForm({
 
     setBusy(true);
     try {
-      const options = {
-        contractId: contractId.trim(),
-        rpcUrl: RPC_URL,
-        networkPassphrase: NETWORK_PASSPHRASE,
-        publicKey: address,
-      };
+      const options = clientOptions(contractId.trim(), address);
       let call;
       if (kind === "stream") {
         const seconds = positiveInteger(duration, "Duration");
