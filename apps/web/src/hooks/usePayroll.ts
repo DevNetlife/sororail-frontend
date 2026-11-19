@@ -5,17 +5,22 @@ import {
   SigningError,
   type Payment,
   type Receipt,
+  type Signer,
 } from "@sororail/sdk";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import type { ChunkStatus } from "@/components/PayrollChunkProgress";
 import { BATCH_PAYOUT_CONTRACT, NATIVE_TOKEN } from "@/lib/network";
 import { useRpc } from "@/lib/rpc-provider";
 import {
   buildPayrollTemplate,
+  mergeDuplicateRows,
   parseCsv,
   removeCsvLines,
   splitPayrollPayments,
+  type MergedAddress,
 } from "@/lib/payroll";
+import { usePayrollDraft } from "@/lib/payrollDraft";
 import type { AddressBookEntry } from "@/lib/addressBook";
 import { estimatePayrollFee, type PayrollFeeEstimate } from "@/lib/payroll-fee";
 import { fetchTokenDecimals } from "@/lib/token";
@@ -55,6 +60,13 @@ export function usePayroll() {
   // this, so nothing can be sent until it is known (#138).
   const [decimals, setDecimals] = useState<number | null>(null);
   const [decimalsError, setDecimalsError] = useState<unknown>(null);
+  // What the last "Merge duplicates" combined, shown until the CSV is edited (#420).
+  const [mergeSummary, setMergeSummary] = useState<MergedAddress[] | null>(null);
+  // Per-batch status of the current run, and the run's fixed inputs so a failed
+  // batch can be retried against the same batches and source rows (#422).
+  const [chunks, setChunks] = useState<ChunkStatus[]>([]);
+  const run = useRef<{ batches: Payment[][]; sourceCsv: string; validLines: number[] } | null>(null);
+  const draft = usePayrollDraft(csv);
 
   const loadCsvFile = useCallback((file: File) => {
     setFileError(null);
@@ -69,6 +81,9 @@ export function usePayroll() {
       setReceipt(null);
       setPreviewError(null);
       setResults([]);
+      setMergeSummary(null);
+      run.current = null;
+      setChunks([]);
     };
     reader.onerror = () => setFileError("Could not read that file.");
     reader.readAsText(file);
@@ -96,6 +111,9 @@ export function usePayroll() {
     // A new batch starts here; earlier "Paid N recipients" notices no
     // longer describe what is on screen (#137).
     setResults([]);
+    setMergeSummary(null);
+    run.current = null;
+    setChunks([]);
   }, []);
 
   const client = useMemo(
@@ -267,39 +285,89 @@ export function usePayroll() {
       );
       return;
     }
+    run.current = { batches, sourceCsv: csv, validLines: valid.map((line) => line.line) };
+    setChunks(batches.map((chunk) => ({ count: chunk.length, state: "pending" })));
+    await runFrom(0);
+  }
+
+  function setChunk(index: number, patch: Partial<ChunkStatus>) {
+    setChunks((current) => current.map((chunk, i) => (i === index ? { ...chunk, ...patch } : chunk)));
+  }
+
+  /** Sends batches from `start` on; a retry of a failed batch resumes here (#422). */
+  async function runFrom(start: number) {
+    const current = run.current;
+    if (!current) return;
+    if (!signer || !address) {
+      setSendError(
+        new SigningError("Wallet disconnected. Reconnect to continue."),
+      );
+      return;
+    }
     setBusy(true);
     setSendError(null);
-    const sourceCsv = csv;
-    let paidCount = 0;
+    let index = start;
     try {
-      for (const chunk of batches) {
+      for (; index < current.batches.length; index++) {
+        const i = index;
+        const chunk = current.batches[i]!;
+        setChunk(i, { state: "pending", error: undefined });
+        // Reports the moment the wallet has signed, before submission and confirmation.
+        const tracked: Signer = {
+          publicKey: signer.publicKey,
+          signTransaction: async (xdr, options) => {
+            const signed = await signer.signTransaction(xdr, options);
+            setChunk(i, { state: "signed" });
+            return signed;
+          },
+        };
         const call = await client.execute({
           funder: address,
           token: NATIVE_TOKEN,
           recipients: chunk,
         });
-        const result = await call.signAndSend(signer);
-        paidCount += chunk.length;
-        setResults((current) => [
-          ...current,
+        const result = await call.signAndSend(tracked);
+        setChunk(i, { state: "confirmed", hash: result.hash });
+        const paidCount = current.batches
+          .slice(0, i + 1)
+          .reduce((count, batch) => count + batch.length, 0);
+        setResults((existing) => [
+          ...existing,
           { hash: result.hash, count: result.result.count },
         ]);
-        setCsv(
-          removeCsvLines(
-            sourceCsv,
-            valid.slice(0, paidCount).map((line) => line.line),
-          ),
-        );
+        setCsv(removeCsvLines(current.sourceCsv, current.validLines.slice(0, paidCount)));
         setReceipt(null);
       }
       setConfirming(false);
       setCsv("");
       setReceipt(null);
+      run.current = null;
+      draft.clear();
     } catch (error) {
+      setChunk(index, {
+        state: "failed",
+        error: error instanceof Error ? error.message : undefined,
+      });
       setSendError(error);
     } finally {
       setBusy(false);
     }
+  }
+
+  function mergeDuplicates() {
+    const { text, merged } = mergeDuplicateRows(csv, decimals ?? undefined);
+    previewSeq.current += 1;
+    setCsv(text);
+    setReceipt(null);
+    setPreviewError(null);
+    setResults([]);
+    setMergeSummary(merged);
+  }
+
+  /** Puts a saved draft back in the editor (#421). */
+  function restoreDraft() {
+    editCsv(draft.savedDraft ?? "");
+    draft.dismiss();
   }
 
   return {
@@ -340,6 +408,12 @@ export function usePayroll() {
     setSendError,
     send,
     results,
+    mergeSummary,
+    mergeDuplicates,
+    chunks,
+    retryFrom: runFrom,
+    draft,
+    restoreDraft,
   };
 }
 

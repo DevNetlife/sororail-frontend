@@ -18,6 +18,10 @@ type PreviewProps = Pick<
   | "capError"
   | "payments"
   | "batches"
+  | "decimalsKnown"
+  | "busy"
+  | "mergeSummary"
+  | "mergeDuplicates"
 >;
 
 /** The parsed recipients table and the notices about them (#438). */
@@ -34,6 +38,10 @@ export function PayrollPreview({
   capError,
   payments,
   batches,
+  decimalsKnown,
+  busy,
+  mergeSummary,
+  mergeDuplicates,
 }: PreviewProps) {
   return (
     <>
@@ -109,7 +117,36 @@ export function PayrollPreview({
           <div className="notice__detail">
             That is allowed — the contract does not reject duplicates, and two
             lines for one contractor is a normal thing to want. Check it is
-            deliberate before sending.
+            deliberate before sending, or merge each address into one row.
+          </div>
+          <div className="row">
+            <button type="button" onClick={mergeDuplicates} disabled={!decimalsKnown || busy}>
+              Merge duplicates
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {mergeSummary ? (
+        <div className="notice notice--info" role="status">
+          <div className="notice__title">
+            {mergeSummary.length > 0
+              ? `Merged ${mergeSummary.length} repeated address${mergeSummary.length === 1 ? "" : "es"}`
+              : "Nothing to merge"}
+          </div>
+          <div className="notice__detail">
+            {mergeSummary.length > 0 ? (
+              <ul className="m-0">
+                {mergeSummary.map((item) => (
+                  <li key={item.to}>
+                    <Address value={item.to} />: lines {item.lines.join(", ")} combined into one row of{" "}
+                    {item.amount}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              "Only valid rows are merged; fix the rows with errors first."
+            )}
           </div>
         </div>
       ) : null}

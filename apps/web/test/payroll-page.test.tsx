@@ -13,14 +13,18 @@ const preview = vi.fn();
 const execute = vi.fn();
 const fetchTokenDecimals = vi.hoisted(() => vi.fn());
 
-vi.mock("@sororail/sdk", () => {
+// Keep the real amount helpers (parseCsv uses toStroops/fromStroops) and the real
+// static chunker; only the network-facing client methods are mocked.
+vi.mock("@sororail/sdk", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@sororail/sdk")>();
   class BatchPayoutClient {
+    static chunk = actual.BatchPayoutClient.chunk;
     maxRecipients = maxRecipients;
     preview = preview;
     execute = execute;
   }
   class SigningError extends Error {}
-  return { BatchPayoutClient, SigningError };
+  return { ...actual, BatchPayoutClient, SigningError };
 });
 
 vi.mock("@/lib/token", () => ({
