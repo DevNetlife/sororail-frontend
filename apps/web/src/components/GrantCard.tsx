@@ -11,6 +11,7 @@ import { PositionDetails, PositionRefresh } from "@/components/PositionCardTools
 import { Figure, PositionCardShell } from "@/components/PositionCardShell";
 import { ActionRow } from "@/components/ReadOnly";
 import { Schedule } from "@/components/Schedule";
+import { VestingTimeline } from "@/components/VestingTimeline";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { usePositionCard } from "@/hooks/usePositionCard";
 import { grantStatus, type PositionStatus } from "@/lib/position-status";
@@ -137,6 +138,14 @@ export function GrantCard({
                 { at: cliffAt, label: "cliff" },
                 ...(g.revokedAt ? [{ at: g.revokedAt, label: "revoked" }] : []),
               ]}
+            />
+
+            <VestingTimeline
+              start={g.start}
+              cliff={g.cliff}
+              duration={g.duration}
+              now={now}
+              revokedAt={g.revokedAt}
             />
 
             <div className="grid">

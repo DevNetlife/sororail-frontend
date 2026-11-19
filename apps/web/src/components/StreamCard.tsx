@@ -10,6 +10,7 @@ import { usePositionPolling } from "@/components/PositionRegistry";
 import { PositionDetails, PositionRefresh } from "@/components/PositionCardTools";
 import { Figure, PositionCardShell } from "@/components/PositionCardShell";
 import { ActionRow } from "@/components/ReadOnly";
+import { AccrualChart } from "@/components/AccrualChart";
 import { Schedule } from "@/components/Schedule";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { usePositionCard } from "@/hooks/usePositionCard";
@@ -141,6 +142,15 @@ export function StreamCard({
               {...(s.cancelledAt
                 ? { marks: [{ at: s.cancelledAt, label: "cancelled" }] }
                 : {})}
+            />
+
+            <AccrualChart
+              start={s.start}
+              stop={s.stop}
+              now={now}
+              deposited={s.deposited}
+              ratePerSecond={s.ratePerSecond}
+              withdrawn={s.withdrawn}
             />
 
             <div className="grid">

@@ -787,3 +787,48 @@ td.numeric {
   margin-top: 0.25rem;
   font-family: var(--font-mono);
 }
+
+/* ── Escrow countdown (#416) ─────────────────────────────────────── */
+
+.escrow-countdown {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: 0.25rem;
+}
+
+.escrow-countdown__unit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 2.25rem;
+}
+
+.escrow-countdown__digit {
+  font-family: var(--font-mono);
+  font-size: 1.1rem;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.03em;
+  color: var(--text);
+}
+
+.escrow-countdown__label {
+  font-size: 0.625rem;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.escrow-countdown__sep {
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  align-self: flex-start;
+  padding-top: 0.1rem;
+}
+
+.escrow-countdown--expired {
+  gap: 0;
+}

@@ -255,17 +255,25 @@ export function CreatePositionForm({
         />
       ) : null}
       {kind === "stream" ? (
-        <Field
-          label="Rate per second (stroops)"
-          value={rate}
-          onChange={(val) => {
-            setRate(val);
-            clearFieldError("rate");
-          }}
-          required
-          inputMode="numeric"
-          error={fieldErrors.rate}
-        />
+        <>
+          <StreamRateCalculator
+            onApply={(stroops) => {
+              setRate(String(stroops));
+              clearFieldError("rate");
+            }}
+          />
+          <Field
+            label="Rate per second (stroops)"
+            value={rate}
+            onChange={(val) => {
+              setRate(val);
+              clearFieldError("rate");
+            }}
+            required
+            inputMode="numeric"
+            error={fieldErrors.rate}
+          />
+        </>
       ) : null}
       <Field
         label={kind === "escrow" ? "Seconds until deadline" : "Duration (seconds)"}
@@ -385,6 +393,90 @@ function TokenPreview({ token, state }: { token: string; state: TokenMetadataSta
     );
   }
   return null;
+}
+
+type RatePeriod = "hour" | "day" | "week" | "month" | "year";
+
+const PERIOD_SECONDS: Record<RatePeriod, bigint> = {
+  hour: 3600n,
+  day: 86400n,
+  week: 604800n,
+  month: 2592000n,  // 30 days
+  year: 31536000n,  // 365 days
+};
+
+/**
+ * Helper that converts a human-friendly "X XLM per period" into stroops per
+ * second and fills the rate field on demand (#413).
+ */
+function StreamRateCalculator({ onApply }: { onApply: (stroops: bigint) => void }) {
+  const [xlm, setXlm] = useState("");
+  const [period, setPeriod] = useState<RatePeriod>("day");
+
+  const computed = (() => {
+    const v = parseFloat(xlm);
+    if (!xlm || isNaN(v) || v <= 0) return null;
+    const stroopsTotal = BigInt(Math.round(v * 1e7));
+    const seconds = PERIOD_SECONDS[period];
+    const rate = stroopsTotal / seconds;
+    return rate > 0n ? rate : null;
+  })();
+
+  return (
+    <div
+      className="stack stack--tight"
+      style={{
+        background: "var(--surface-sunken)",
+        borderRadius: "var(--radius)",
+        padding: "0.75rem",
+      }}
+    >
+      <div className="small muted">Rate calculator</div>
+      <div className="row" style={{ gap: "0.5rem", alignItems: "flex-end", flexWrap: "wrap" }}>
+        <div className="field" style={{ flex: "1 1 8rem", margin: 0 }}>
+          <label className="label" htmlFor="calc-xlm">Amount (XLM)</label>
+          <input
+            id="calc-xlm"
+            type="number"
+            min="0"
+            step="0.0000001"
+            placeholder="e.g. 100"
+            value={xlm}
+            onChange={(e) => setXlm(e.target.value)}
+          />
+        </div>
+        <div className="field" style={{ margin: 0 }}>
+          <label className="label" htmlFor="calc-period">per</label>
+          <select
+            id="calc-period"
+            value={period}
+            onChange={(e) => setPeriod(e.target.value as RatePeriod)}
+          >
+            <option value="hour">Hour</option>
+            <option value="day">Day</option>
+            <option value="week">Week</option>
+            <option value="month">Month (30d)</option>
+            <option value="year">Year (365d)</option>
+          </select>
+        </div>
+      </div>
+      {computed !== null ? (
+        <div className="row small" style={{ gap: "0.5rem", alignItems: "center" }}>
+          <span className="muted">= </span>
+          <span style={{ fontFamily: "var(--font-mono)" }}>{String(computed)}</span>
+          <span className="muted"> stroops/sec</span>
+          <button
+            type="button"
+            className="button--primary"
+            style={{ padding: "0.2rem 0.6rem", fontSize: "0.8rem" }}
+            onClick={() => onApply(computed)}
+          >
+            Use
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 function positiveInteger(value: string, name: string): bigint {
