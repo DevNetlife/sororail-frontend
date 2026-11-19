@@ -7,6 +7,7 @@ import { Confirm } from "@/components/Confirm";
 import { ErrorNotice, SuccessNotice } from "@/components/Feedback";
 import { Address, Money } from "@/components/Money";
 import { usePositionPolling } from "@/components/PositionRegistry";
+import { PositionDetails, PositionRefresh } from "@/components/PositionCardTools";
 import { Figure, PositionCardShell } from "@/components/PositionCardShell";
 import { Schedule } from "@/components/Schedule";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
@@ -24,7 +25,7 @@ export function StreamCard({ position }: { position: Position }) {
   const [done, setDone] = useState<{ text: string; hash: string } | null>(null);
   const [now, setNow] = useState<bigint>(() => BigInt(Math.floor(Date.now() / 1000)));
 
-  const { data: stream, loadError, client, refresh, isLoading } = usePositionCard(
+  const { data: stream, loadError, client, refresh, isLoading, isRefreshing, lastUpdatedAt } = usePositionCard(
     StreamClient,
     position,
     address,
@@ -100,6 +101,9 @@ export function StreamCard({ position }: { position: Position }) {
         const ended = now >= s.stop;
         return (
           <>
+            <PositionRefresh onRefresh={refresh} isRefreshing={isRefreshing} lastUpdatedAt={lastUpdatedAt} />
+            <PositionDetails kind="stream" data={s} />
+
             <div className="row">
               {s.cancelledAt ? (
                 <span className="pill pill--done">Cancelled</span>

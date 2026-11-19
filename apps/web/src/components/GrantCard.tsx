@@ -7,6 +7,7 @@ import { Confirm } from "@/components/Confirm";
 import { ErrorNotice, SuccessNotice } from "@/components/Feedback";
 import { Address, Money } from "@/components/Money";
 import { usePositionPolling } from "@/components/PositionRegistry";
+import { PositionDetails, PositionRefresh } from "@/components/PositionCardTools";
 import { Figure, PositionCardShell } from "@/components/PositionCardShell";
 import { Schedule } from "@/components/Schedule";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
@@ -22,7 +23,7 @@ export function GrantCard({ position }: { position: Position }) {
   const [done, setDone] = useState<{ text: string; hash: string } | null>(null);
   const [now, setNow] = useState<bigint>(() => BigInt(Math.floor(Date.now() / 1000)));
 
-  const { data: grant, loadError, client, refresh, isLoading } = usePositionCard(
+  const { data: grant, loadError, client, refresh, isLoading, isRefreshing, lastUpdatedAt } = usePositionCard(
     VestingClient,
     position,
     address,
@@ -93,6 +94,9 @@ export function GrantCard({ position }: { position: Position }) {
         const beforeCliff = now < cliffAt;
         return (
           <>
+            <PositionRefresh onRefresh={refresh} isRefreshing={isRefreshing} lastUpdatedAt={lastUpdatedAt} />
+            <PositionDetails kind="vesting" data={g} />
+
             <div className="row">
               {g.revokedAt ? (
                 <span className="pill pill--done">Revoked</span>
