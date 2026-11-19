@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { GeistSans } from "geist/font/sans";
 
@@ -11,10 +11,18 @@ import { WalletProvider } from "@/lib/wallet";
 
 import "./globals.css";
 
+const DESCRIPTION =
+  "Reference application for the SoroRail Soroban payment contracts. Testnet only, unaudited.";
+
 export const metadata: Metadata = {
-  title: "SoroRail — reference app",
-  description:
-    "Reference application for the SoroRail Soroban payment contracts. Testnet only, unaudited.",
+  title: { default: "SoroRail — reference app", template: "%s · SoroRail" },
+  description: DESCRIPTION,
+  openGraph: { title: "SoroRail — reference app", description: DESCRIPTION, type: "website" },
+  twitter: { card: "summary_large_image", title: "SoroRail — reference app", description: DESCRIPTION },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0b0d12",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
