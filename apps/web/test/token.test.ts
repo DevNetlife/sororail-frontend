@@ -65,3 +65,35 @@ describe("fetchTokenDecimals", () => {
     );
   });
 });
+describe("fetchTokenMetadata (#411)", () => {
+  it("reads symbol, name and decimals once per token and caches the result", async () => {
+    const { clearTokenMetadataCache, fetchTokenMetadata } = await import("../src/lib/token");
+    clearTokenMetadataCache();
+    mocks.simulateTransaction.mockReset();
+    mocks.isSimulationSuccess.mockReturnValue(true);
+    mocks.simulateTransaction.mockResolvedValue({ result: { retval: "x" } });
+    mocks.scValToNative.mockReset();
+    mocks.scValToNative
+      .mockReturnValueOnce("USDC")
+      .mockReturnValueOnce("USD Coin")
+      .mockReturnValueOnce(7);
+    const server = { simulateTransaction: mocks.simulateTransaction } as never;
+
+    await expect(fetchTokenMetadata("token-a", server)).resolves.toEqual({ symbol: "USDC", name: "USD Coin", decimals: 7 });
+    await fetchTokenMetadata("token-a", server);
+    expect(mocks.simulateTransaction).toHaveBeenCalledTimes(3);
+  });
+
+  it("rejects a contract that does not answer the token interface, and does not cache the failure", async () => {
+    const { NotATokenError, clearTokenMetadataCache, fetchTokenMetadata } = await import("../src/lib/token");
+    clearTokenMetadataCache();
+    mocks.simulateTransaction.mockReset();
+    mocks.simulateTransaction.mockResolvedValue({ error: "no such function" });
+    mocks.isSimulationSuccess.mockReturnValue(false);
+    const server = { simulateTransaction: mocks.simulateTransaction } as never;
+
+    await expect(fetchTokenMetadata("not-a-token", server)).rejects.toBeInstanceOf(NotATokenError);
+    await expect(fetchTokenMetadata("not-a-token", server)).rejects.toBeInstanceOf(NotATokenError);
+    expect(mocks.simulateTransaction.mock.calls.length).toBeGreaterThan(3);
+  });
+});

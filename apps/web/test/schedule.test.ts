@@ -6,6 +6,7 @@ import { renderToString } from "react-dom/server";
 (globalThis as unknown as { React: typeof React }).React = React;
 
 import { Schedule, WhenLabel } from "../src/components/Schedule";
+import { formatDateTime } from "../src/lib/format";
 
 describe("Schedule accessibility", () => {
   it("renders progressbar with proper ARIA attributes", () => {
@@ -57,8 +58,6 @@ describe("Schedule accessibility", () => {
 // #283 — start, cliff, and end date rendering + label ordering
 describe("Schedule date axis (#283)", () => {
   // Timestamps chosen to produce deterministic toLocaleDateString output.
-  // All are < 1_000_000_000 so formatDate's (ts % 1_000_000_000) * 1000 stays
-  // within a valid JS Date range.
   const START = 0n;
   const CLIFF = 250_000n;
   const END = 500_000n;
@@ -144,7 +143,7 @@ describe("WhenLabel (#284)", () => {
     const now = 200_000n;
     const html = renderWhen(at, now);
 
-    const expected = new Date(Number(at) * 1000).toLocaleString();
+    const expected = formatDateTime(at);
     // Past timestamps are shown as the absolute date, not a countdown.
     expect(html).toContain(expected);
     expect(html).not.toContain("in ");
@@ -155,7 +154,7 @@ describe("WhenLabel (#284)", () => {
     const at = 100_000n;
     const html = renderWhen(at, at);
 
-    const expected = new Date(Number(at) * 1000).toLocaleString();
+    const expected = formatDateTime(at);
     expect(html).toContain(expected);
     expect(html).not.toContain("in ");
   });
@@ -197,8 +196,8 @@ describe("WhenLabel (#284)", () => {
     const future = renderWhen(at + 3_600n, at);
     const past = renderWhen(at - 3_600n, at);
 
-    const absolute = new Date(Number(at) * 1000).toLocaleString();
-    const absoluteFuture = new Date(Number(at + 3_600n) * 1000).toLocaleString();
+    const absolute = formatDateTime(at);
+    const absoluteFuture = formatDateTime(at + 3_600n);
     expect(future).toContain(`title="${absoluteFuture}"`);
     expect(past).toContain(`title="${absolute}"`);
   });

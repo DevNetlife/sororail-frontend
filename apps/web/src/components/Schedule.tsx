@@ -9,20 +9,12 @@
  * time axis.
  */
 
+import { formatDate, formatDateTime } from "@/lib/format";
+
 export interface ScheduleMark {
   /** Ledger timestamp, seconds. */
   at: bigint;
   label: string;
-}
-
-function formatDate(seconds: bigint): string {
-  const ms = Number(seconds % 1_000_000_000n) * 1000;
-  const date = new Date(ms);
-  return date.toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
 }
 
 function percent(value: bigint, start: bigint, end: bigint): number {
@@ -96,7 +88,7 @@ export function Schedule({
 /** A date and the time remaining to it, stated rather than implied. */
 export function WhenLabel({ at, now }: { at: bigint; now: bigint }) {
   const seconds = Number(at - now);
-  const absolute = new Date(Number(at) * 1000).toLocaleString();
+  const absolute = formatDateTime(at);
 
   if (seconds <= 0) return <span title={absolute}>{absolute}</span>;
 

@@ -7,17 +7,15 @@ import {
   PositionCount,
 } from "@/components/OverviewInteractive";
 import { PositionBackup } from "@/components/PositionRegistry";
+import { t } from "@/lib/i18n";
 import { BATCH_PAYOUT_CONTRACT, shortAddress } from "@/lib/network";
 
 export default function OverviewPage() {
   return (
     <div className="stack">
       <div>
-        <h1>Overview</h1>
-        <p className="muted page-intro">
-          A reference application for the SoroRail payment contracts. Everything
-          shown here is read from the chain.
-        </p>
+        <h1>{t("overview.title")}</h1>
+        <p className="muted page-intro">{t("overview.intro")}</p>
       </div>
 
       <ConnectWalletCard />
@@ -25,45 +23,35 @@ export default function OverviewPage() {
       <div className="grid">
         <Tile
           href="/payroll"
-          title="Payroll"
-          body="Pay many recipients in one transaction."
+          title={t("overview.tile.payroll.title")}
+          body={t("overview.tile.payroll.body")}
         />
         <Tile
           href="/streams"
-          title="Streams"
+          title={t("overview.tile.streams.title")}
           count={<PositionCount kind="stream" />}
-          body="Continuous per-second transfer. Withdraw, top up, extend or cancel."
+          body={t("overview.tile.streams.body")}
         />
         <Tile
           href="/vesting"
-          title="Vesting"
+          title={t("overview.tile.vesting.title")}
           count={<PositionCount kind="vesting" />}
-          body="Scheduled release with a cliff. Claim what has vested, or revoke."
+          body={t("overview.tile.vesting.body")}
         />
         <Tile
           href="/escrow"
-          title="Escrow"
+          title={t("overview.tile.escrow.title")}
           count={<PositionCount kind="escrow" />}
-          body="Funds held until a condition is met, with an optional arbiter."
+          body={t("overview.tile.escrow.body")}
         />
       </div>
 
       <div className="card stack stack--tight">
-        <h2>How this app finds your positions</h2>
+        <h2>{t("overview.positions.title")}</h2>
+        <p className="small muted m-0">{t("overview.positions.p1")}</p>
+        <p className="small muted m-0">{t("overview.positions.p2")}</p>
         <p className="small muted m-0">
-          Each escrow, stream and grant is its own deployed contract, holding
-          exactly one position for its whole life. There is no on-chain index
-          tying them to your account, so this app keeps a list of addresses you
-          have told it about, in this browser only.
-        </p>
-        <p className="small muted m-0">
-          That list is a convenience, not a record. Every balance and state you
-          see is read from the contract itself, and removing an address from the
-          list changes nothing on chain.
-        </p>
-        <p className="small muted m-0">
-          <code className="addr">batch_payout</code> is the exception — it is
-          stateless, so one shared deployment serves everybody:{" "}
+          <code className="addr">batch_payout</code> {t("overview.positions.batchPrefix")}{" "}
           <ContractLink id={BATCH_PAYOUT_CONTRACT} className="addr">
             {shortAddress(BATCH_PAYOUT_CONTRACT, 6)}
           </ContractLink>
@@ -73,12 +61,8 @@ export default function OverviewPage() {
       <PositionBackup />
 
       <div className="notice notice--warn">
-        <div className="notice__title">Not yet built</div>
-        <div className="notice__detail">
-          The indexer, unified history feed and CSV export described in the spec
-          are not implemented. There is no database and no backend — this app is
-          entirely client-side against Soroban RPC.
-        </div>
+        <div className="notice__title">{t("overview.notBuilt.title")}</div>
+        <div className="notice__detail">{t("overview.notBuilt.detail")}</div>
       </div>
     </div>
   );
