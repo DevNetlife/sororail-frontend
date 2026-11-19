@@ -112,6 +112,30 @@ jobs:
           echo "### ⚠️ No changeset found" >> "$GITHUB_STEP_SUMMARY"
           echo "If this PR changes published behaviour, add one with \`pnpm exec changeset\`." >> "$GITHUB_STEP_SUMMARY"
 
+  # Checks every link in the built docs site. Internal links are remapped onto
+  # the build output; external links are checked live. Hosts that rate-limit
+  # anonymous requests are excluded.
+  docs-links:
+    name: docs links
+    runs-on: ubuntu-latest
+    if: github.event_name != schedule
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: pnpm --filter @sororail/docs build
+      - name: Check links
+        uses: lycheeverse/lychee-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          fail: true
+          args: >-
+            --base https://sororail.github.io
+            --remap "https://sororail.github.io/sororail-frontend/(.*) file://${{ github.workspace }}/apps/docs/dist/$1"
+            --exclude "^https?://(www\.)?(linkedin|x|twitter)\.com"
+            --exclude "^https?://(www\.)?reddit\.com"
+            "apps/docs/dist/**/*.html"
+
   # The examples talk to a real network, so they run on a schedule rather than
   # on every PR. Each one asserts what it demonstrates, so together they are the
   # SDK's integration suite. The job funds its own throwaway testnet accounts
