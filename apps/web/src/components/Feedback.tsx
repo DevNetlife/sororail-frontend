@@ -7,10 +7,11 @@ import {
   SigningError,
   ValidationError,
 } from "@sororail/sdk";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 
 import { explorerTx } from "@/lib/network";
 import { recoveryFor } from "@/lib/recovery";
+import { reportError } from "@/lib/reportError";
 
 /**
  * Errors say what happened and what to do about it.
@@ -29,6 +30,12 @@ export function ErrorNotice({
   error: unknown;
   onRetry?: () => void | Promise<void>;
 }) {
+  // Every failed load and action in the app is shown here, so this is the one
+  // place that reports them (#433). Once per distinct error, not per render.
+  useEffect(() => {
+    if (error) reportError(error, { source: "ErrorNotice" });
+  }, [error]);
+
   if (!error) return null;
 
   const recovery = recoveryFor(error);
