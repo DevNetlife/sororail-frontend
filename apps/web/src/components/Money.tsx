@@ -2,9 +2,10 @@
 
 import { memo, useState } from "react";
 
+import { CopyButton } from "@/components/CopyButton";
 import { useTokenMetadata } from "@/hooks/useTokenMetadata";
 import { formatTokenAmount } from "@/lib/format";
-import { shortAddress } from "@/lib/network";
+import { explorerContract, shortAddress } from "@/lib/network";
 
 export interface MoneyProps {
   value: bigint;
@@ -101,52 +102,39 @@ export const Money = memo(function Money({
 });
 
 /** A contract or account address, shortened but copyable in full. */
-export function Address({ value, href }: { value: string; href?: string }) {
+export function Address({
+  value,
+  href,
+  explorer = false,
+}: {
+  value: string;
+  href?: string;
+  /** When true, automatically links to the block explorer for this contract address. */
+  explorer?: boolean;
+}) {
   const short = shortAddress(value, 6);
-  const [copied, setCopied] = useState(false);
+  const explorerHref = explorer ? explorerContract(value) : null;
+  const resolvedHref = href ?? explorerHref ?? undefined;
 
-  async function copyAddress() {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1500);
-    } catch {
-      setCopied(false);
-    }
-  }
-
-  const content = (
+  const label = (
     <>
       <span aria-hidden="true">{short}</span>
       <span className="sr-only">{value}</span>
-      {copied ? <span className="addr__confirmation" role="status">Copied</span> : null}
     </>
   );
 
-  if (href) {
-    return (
-      <a
-        className="addr"
-        href={href}
-        target="_blank"
-        rel="noreferrer"
-        title={value}
-        aria-label="Copy address and open explorer"
-        onClick={() => void copyAddress()}
-      >
-        {content}
-      </a>
-    );
-  }
   return (
-    <button
-      type="button"
-      className="addr addr--button"
-      title={value}
-      aria-label={copied ? "Address copied" : "Copy address"}
-      onClick={() => void copyAddress()}
-    >
-      {content}
-    </button>
+    <span className="addr-wrap">
+      {resolvedHref ? (
+        <a className="addr" href={resolvedHref} target="_blank" rel="noopener noreferrer" title={value}>
+          {label}
+        </a>
+      ) : (
+        <span className="addr" title={value}>
+          {label}
+        </span>
+      )}
+      <CopyButton text={value} label="Copy address" />
+    </span>
   );
 }
