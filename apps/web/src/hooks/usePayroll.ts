@@ -8,12 +8,8 @@ import {
 } from "@sororail/sdk";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import {
-  BATCH_PAYOUT_CONTRACT,
-  NATIVE_TOKEN,
-  NETWORK_PASSPHRASE,
-  RPC_URL,
-} from "@/lib/network";
+import { BATCH_PAYOUT_CONTRACT, NATIVE_TOKEN } from "@/lib/network";
+import { useRpc } from "@/lib/rpc-provider";
 import {
   buildPayrollTemplate,
   parseCsv,
@@ -34,6 +30,7 @@ export const MAX_VISIBLE_VALID_ROWS = 200;
  */
 export function usePayroll() {
   const { address, signer, connect } = useWallet();
+  const { clientOptions } = useRpc();
   const [csv, setCsv] = useState("");
   const [cap, setCap] = useState<number | null>(null);
   const [capError, setCapError] = useState<unknown>(null);
@@ -96,14 +93,8 @@ export function usePayroll() {
   }, []);
 
   const client = useMemo(
-    () =>
-      new BatchPayoutClient({
-        contractId: BATCH_PAYOUT_CONTRACT,
-        rpcUrl: RPC_URL,
-        networkPassphrase: NETWORK_PASSPHRASE,
-        ...(address ? { publicKey: address } : {}),
-      }),
-    [address],
+    () => new BatchPayoutClient(clientOptions(BATCH_PAYOUT_CONTRACT, address)),
+    [clientOptions, address],
   );
 
   // Read the cap rather than hardcoding: it is derived from network resource

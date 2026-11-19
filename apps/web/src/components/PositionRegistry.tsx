@@ -10,6 +10,7 @@ import {
   getPositionCountsSnapshot,
   getPositionsSnapshot,
   importPositions,
+  MAX_IMPORT_SIZE,
   looksLikeContractId,
   removePosition,
   renamePosition,
@@ -281,6 +282,13 @@ export function PositionBackup() {
   function handleImportFile(file: File) {
     setError(null);
     setMessage(null);
+    // Refuse before reading: loading a huge file into memory is what freezes the tab (#443).
+    if (file.size > MAX_IMPORT_SIZE) {
+      setError(
+        `That file is too large to be a positions backup (limit ${MAX_IMPORT_SIZE / 1024} KB).`,
+      );
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => {
       try {
