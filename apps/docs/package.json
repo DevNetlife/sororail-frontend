@@ -7,7 +7,9 @@
     "node": ">=22.12.0"
   },
   "scripts": {
+    "predev": "node scripts/sync-changelog.mjs",
     "dev": "astro dev",
+    "prebuild": "node scripts/sync-changelog.mjs",
     "build": "astro build",
     "typecheck": "tsc --noEmit",
     "preview": "astro preview",

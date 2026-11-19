@@ -24,6 +24,7 @@ export default defineConfig({
           items: [
             { label: "Getting started", slug: "getting-started" },
             { label: "Troubleshooting", slug: "troubleshooting" },
+            { label: "Changelog", slug: "changelog" },
           ],
         },
         {
