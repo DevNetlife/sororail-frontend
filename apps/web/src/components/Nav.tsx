@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import { NetworkBadge } from "@/components/NetworkBadge";
+import { XlmBalance } from "@/components/XlmBalance";
 import { shortAddress } from "@/lib/network";
 import { useWallet } from "@/lib/wallet";
 
@@ -82,6 +83,7 @@ export function Nav() {
             <span className="addr" title={address}>
               {shortAddress(address, 6)}
             </span>
+            <XlmBalance address={address} />
             <button type="button" className="button--quiet" onClick={disconnect}>
               Disconnect
             </button>
