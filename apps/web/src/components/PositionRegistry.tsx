@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { ContractLink } from "@/components/ContractLink";
+import { useToast } from "@/hooks/useToast";
 import {
   addPosition,
   exportPositions,
@@ -264,9 +265,9 @@ export function PositionHeader({ position }: { position: Position }) {
  * only in this browser's `localStorage`.
  */
 export function PositionBackup() {
-  const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const toast = useToast();
 
   function handleExport() {
     const json = exportPositions();
@@ -281,7 +282,6 @@ export function PositionBackup() {
 
   function handleImportFile(file: File) {
     setError(null);
-    setMessage(null);
     // Refuse before reading: loading a huge file into memory is what freezes the tab (#443).
     if (file.size > MAX_IMPORT_SIZE) {
       setError(
@@ -293,7 +293,7 @@ export function PositionBackup() {
     reader.onload = () => {
       try {
         const result = importPositions(String(reader.result ?? ""));
-        setMessage(
+        toast.success(
           `Imported ${result.added} position${result.added === 1 ? "" : "s"}` +
             (result.skipped ? ` (${result.skipped} already tracked)` : "") +
             ".",
@@ -337,7 +337,6 @@ export function PositionBackup() {
           }}
         />
       </div>
-      {message ? <p className="small muted m-0">{message}</p> : null}
       {error ? <p className="small text-danger m-0">{error}</p> : null}
     </div>
   );

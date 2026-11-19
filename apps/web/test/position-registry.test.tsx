@@ -9,6 +9,7 @@ import {
   PositionHeader,
   usePositionPolling,
 } from "../src/components/PositionRegistry";
+import { ToastProvider } from "../src/components/ToastProvider";
 import type { Position } from "../src/lib/positions";
 
 // Mock @/lib/positions while keeping real functions available and spied
@@ -309,7 +310,11 @@ describe("PositionBackup (#297)", () => {
   it("shows a success message when a valid backup file is imported", async () => {
     vi.mocked(importPositions).mockReturnValue({ added: 2, skipped: 1 });
 
-    render(<PositionBackup />);
+    render(
+      <ToastProvider>
+        <PositionBackup />
+      </ToastProvider>,
+    );
 
     const fileInput = screen.getByLabelText("Import positions backup file");
     const validFile = new File([JSON.stringify([TEST_POSITION])], "valid.json", {
