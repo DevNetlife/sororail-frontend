@@ -29,6 +29,7 @@ import { filterPositions } from "@/lib/position-filter";
 import type { Position } from "@/lib/positions";
 import { RPC_URL } from "@/lib/network";
 import { useWallet } from "@/lib/wallet";
+import { trackSubmit } from "@/lib/session-activity";
 import { usePositionCard } from "@/hooks/usePositionCard";
 
 type Action = "fund" | "release" | "refund" | "dispute" | "resolve";
@@ -123,7 +124,7 @@ function EscrowCard({ position }: { position: Position }) {
               : action === "dispute"
                 ? await client.dispute()
                 : await client.resolve(splitBps);
-      const sent = await call.signAndSend(signer);
+      const sent = await trackSubmit(successMessage(action), () => call.signAndSend(signer));
       setDone({ text: successMessage(action), hash: sent.hash });
       setPending(null);
       await refresh();

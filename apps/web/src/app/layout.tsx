@@ -4,6 +4,7 @@ import { GeistSans } from "geist/font/sans";
 
 import { Nav } from "@/components/Nav";
 import { NetworkGuard } from "@/components/NetworkGuard";
+import { SessionActivityPanel } from "@/components/SessionActivityPanel";
 import { ToastProvider } from "@/components/ToastProvider";
 import { RpcProvider } from "@/lib/rpc-provider";
 import { WalletProvider } from "@/lib/wallet";
@@ -38,6 +39,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           </div>
           <Nav />
           <main id="main-content" className="shell">{children}</main>
+          <SessionActivityPanel />
           </NetworkGuard>
         </WalletProvider>
         </RpcProvider>

@@ -9,6 +9,7 @@ import { NATIVE_TOKEN } from "@/lib/network";
 import { addPosition, looksLikeContractId, type PositionKind } from "@/lib/positions";
 import { useRpc } from "@/lib/rpc-provider";
 import { useWallet } from "@/lib/wallet";
+import { trackSubmit } from "@/lib/session-activity";
 
 const titles: Record<Exclude<PositionKind, "recurring">, string> = {
   stream: "Create a stream",
@@ -192,7 +193,7 @@ export function CreatePositionForm({
         });
       }
 
-      const sent = await call.signAndSend(signer);
+      const sent = await trackSubmit(`Create ${kind}`, () => call.signAndSend(signer));
       const saved = addPosition(kind, contractId, label);
       setSuccess({ hash: sent.hash, saved });
     } catch (cause) {

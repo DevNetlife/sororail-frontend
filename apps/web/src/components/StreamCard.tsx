@@ -17,6 +17,7 @@ import { usePositionCard } from "@/hooks/usePositionCard";
 import { streamStatus, type PositionStatus } from "@/lib/position-status";
 import type { Position } from "@/lib/positions";
 import { useWallet } from "@/lib/wallet";
+import { trackSubmit } from "@/lib/session-activity";
 
 /** One tracked stream: schedule, balances and its actions (moved from `streams/page.tsx`, #439). */
 export function StreamCard({
@@ -93,7 +94,7 @@ export function StreamCard({
       call = await client.extend(ts);
       successText = "Stream end date extended.";
     }
-    const sent = await call.signAndSend(signer);
+    const sent = await trackSubmit(successText, () => call.signAndSend(signer));
     setDone({ text: successText, hash: sent.hash });
     setPending(null);
     setTopUpAmount("");
