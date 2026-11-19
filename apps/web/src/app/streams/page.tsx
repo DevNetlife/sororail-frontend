@@ -11,6 +11,7 @@ import { StatusFilter, useStatusFilter } from "@/components/StatusFilter";
 import { StreamCard } from "@/components/StreamCard";
 import { filterPositions } from "@/lib/position-filter";
 import { isVisible } from "@/lib/position-status";
+import { looksLikeContractId } from "@/lib/positions";
 
 export default function StreamsPage() {
   const allPositions = usePositions("stream");
@@ -18,8 +19,17 @@ export default function StreamsPage() {
   const positions = filterPositions(allPositions, query);
   const { filter, setFilter, statuses, report } = useStatusFilter();
   const [hydrated, setHydrated] = useState(false);
+  const [deepLinkId, setDeepLinkId] = useState<string | undefined>(undefined);
 
-  useEffect(() => setHydrated(true), []);
+  useEffect(() => {
+    setHydrated(true);
+    const params = new URLSearchParams(window.location.search);
+    const add = params.get("add");
+    const kind = params.get("kind");
+    if (add && looksLikeContractId(add) && (!kind || kind === "stream")) {
+      setDeepLinkId(add);
+    }
+  }, []);
 
   return (
     <div className="stack">
@@ -66,7 +76,7 @@ export default function StreamsPage() {
       )}
 
       <CreatePositionForm kind="stream" />
-      <AddPositionForm kind="stream" noun="stream" />
+      <AddPositionForm kind="stream" noun="stream" initialContractId={deepLinkId} />
     </div>
   );
 }
