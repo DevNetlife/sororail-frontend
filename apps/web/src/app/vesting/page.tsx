@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
 import { CreatePositionForm } from "@/components/CreatePositionForm";
 import { EmptyState } from "@/components/Feedback";
 import { GrantCard } from "@/components/GrantCard";
@@ -8,12 +10,23 @@ import { AddPositionForm, usePositions } from "@/components/PositionRegistry";
 import { PositionFilter, usePositionFilter } from "@/components/PositionFilter";
 import { StatusFilter, useStatusFilter } from "@/components/StatusFilter";
 import { isVisible } from "@/lib/position-status";
+import { looksLikeContractId } from "@/lib/positions";
 
 export default function VestingPage() {
   const allPositions = usePositions("vesting");
   const [query, setQuery] = usePositionFilter();
   const positions = filterPositions(allPositions, query);
   const { filter, setFilter, statuses, report } = useStatusFilter();
+  const [deepLinkId, setDeepLinkId] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const add = params.get("add");
+    const kind = params.get("kind");
+    if (add && looksLikeContractId(add) && (!kind || kind === "vesting")) {
+      setDeepLinkId(add);
+    }
+  }, []);
 
   return (
     <div className="stack">
@@ -54,7 +67,7 @@ export default function VestingPage() {
       )}
 
       <CreatePositionForm kind="vesting" />
-      <AddPositionForm kind="vesting" noun="grant" />
+      <AddPositionForm kind="vesting" noun="grant" initialContractId={deepLinkId} />
     </div>
   );
 }
