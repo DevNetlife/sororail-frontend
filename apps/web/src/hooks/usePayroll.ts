@@ -15,10 +15,12 @@ import {
   RPC_URL,
 } from "@/lib/network";
 import {
+  buildPayrollTemplate,
   parseCsv,
   removeCsvLines,
   splitPayrollPayments,
 } from "@/lib/payroll";
+import type { AddressBookEntry } from "@/lib/addressBook";
 import { fetchTokenDecimals } from "@/lib/token";
 import { useWallet } from "@/lib/wallet";
 
@@ -42,6 +44,8 @@ export function usePayroll() {
   const [sendError, setSendError] = useState<unknown>(null);
   const [results, setResults] = useState<{ hash: string; count: number }[]>([]);
   const [dragActive, setDragActive] = useState(false);
+  // Session-only labels for recipients; never persisted (see lib/addressBook).
+  const [addressBook, setAddressBook] = useState<AddressBookEntry[]>([]);
   const [fileError, setFileError] = useState<string | null>(null);
   const previewSeq = useRef(0);
   // The token's decimals, read from the token contract. Amounts are scaled by
@@ -65,6 +69,19 @@ export function usePayroll() {
     };
     reader.onerror = () => setFileError("Could not read that file.");
     reader.readAsText(file);
+  }, []);
+
+  const downloadTemplate = useCallback(() => {
+    const url = URL.createObjectURL(
+      new Blob([buildPayrollTemplate()], { type: "text/csv" }),
+    );
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "payroll-template.csv";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
   }, []);
 
   /** The textarea's change handler. */
@@ -287,6 +304,9 @@ export function usePayroll() {
     csv,
     editCsv,
     loadCsvFile,
+    downloadTemplate,
+    addressBook,
+    setAddressBook,
     dragActive,
     setDragActive,
     fileError,

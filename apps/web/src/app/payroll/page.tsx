@@ -1,5 +1,6 @@
 "use client";
 
+import { AddressBook } from "@/components/AddressBook";
 import { Confirm } from "@/components/Confirm";
 import { ContractLink } from "@/components/ContractLink";
 import { ErrorNotice } from "@/components/Feedback";
@@ -18,6 +19,9 @@ export default function PayrollPage() {
     csv,
     editCsv,
     loadCsvFile,
+    downloadTemplate,
+    addressBook,
+    setAddressBook,
     dragActive,
     setDragActive,
     fileError,
@@ -55,6 +59,8 @@ export default function PayrollPage() {
         </div>
       ) : null}
 
+      <AddressBook entries={addressBook} onChange={setAddressBook} />
+
       <div className="card stack stack--tight">
         <h2 id="recipients-heading">Recipients</h2>
         <p className="small muted m-0">
@@ -81,6 +87,9 @@ export default function PayrollPage() {
           <label className="button" htmlFor="payroll-csv-file">
             Choose file
           </label>
+          <button type="button" className="button" onClick={downloadTemplate}>
+            Download template
+          </button>
           <input
             id="payroll-csv-file"
             type="file"

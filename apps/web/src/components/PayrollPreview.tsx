@@ -2,10 +2,12 @@
 
 import { Address, Money } from "@/components/Money";
 import { MAX_VISIBLE_VALID_ROWS, type PayrollState } from "@/hooks/usePayroll";
+import { labelFor } from "@/lib/addressBook";
 
 type PreviewProps = Pick<
   PayrollState,
   | "address"
+  | "addressBook"
   | "parsed"
   | "visible"
   | "hiddenValidCount"
@@ -21,6 +23,7 @@ type PreviewProps = Pick<
 /** The parsed recipients table and the notices about them (#438). */
 export function PayrollPreview({
   address,
+  addressBook,
   parsed,
   visible,
   hiddenValidCount,
@@ -51,7 +54,14 @@ export function PayrollPreview({
                   <td className="muted">{line.line}</td>
                   <td>
                     {line.to ? (
-                      <Address value={line.to} />
+                      <>
+                        <Address value={line.to} />
+                        {labelFor(addressBook, line.to) ? (
+                          <span className="small muted">
+                            {" "}({labelFor(addressBook, line.to)})
+                          </span>
+                        ) : null}
+                      </>
                     ) : (
                       <span className="muted">—</span>
                     )}
