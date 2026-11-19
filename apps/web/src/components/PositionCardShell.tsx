@@ -9,25 +9,23 @@ import type { Position } from "@/lib/positions";
 import { RPC_URL } from "@/lib/network";
 
 /**
- * The shell every position card shares (#439): the other-network, no-wallet,
- * load-error and loading states, then the loaded card with its header. The
- * loaded body is a render function so it only runs once the data exists.
+ * The shell every position card shares (#439): the other-network, load-error
+ * and loading states, then the loaded card with its header. Reading never
+ * needs a wallet (#446), so there is no no-wallet state; the card's own
+ * actions go read-only instead. The loaded body is a render function so it
+ * only runs once the data exists.
  */
 export function PositionCardShell({
   position,
-  address,
   loadError,
   loading,
   onRetry,
-  noun,
   children,
 }: {
   position: Position;
-  address: string | null;
   loadError: unknown;
   loading: boolean;
   onRetry: () => void | Promise<void>;
-  noun: string;
   children: () => ReactNode;
 }) {
   if (position.network && position.network !== RPC_URL) {
@@ -40,15 +38,6 @@ export function PositionCardShell({
             This position is from a different network.
           </div>
         </div>
-      </div>
-    );
-  }
-
-  if (!address) {
-    return (
-      <div className="card">
-        <PositionHeader position={position} />
-        <p className="small muted">Connect a wallet to read this {noun}.</p>
       </div>
     );
   }

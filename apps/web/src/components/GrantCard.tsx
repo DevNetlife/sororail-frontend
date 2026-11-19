@@ -9,6 +9,7 @@ import { Address, Money } from "@/components/Money";
 import { usePositionPolling } from "@/components/PositionRegistry";
 import { PositionDetails, PositionRefresh } from "@/components/PositionCardTools";
 import { Figure, PositionCardShell } from "@/components/PositionCardShell";
+import { ActionRow } from "@/components/ReadOnly";
 import { Schedule } from "@/components/Schedule";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { usePositionCard } from "@/hooks/usePositionCard";
@@ -94,11 +95,9 @@ export function GrantCard({
   return (
     <PositionCardShell
       position={position}
-      address={address}
       loadError={loadError}
       loading={isLoading || !grant}
       onRetry={refresh}
-      noun="grant"
     >
       {() => {
         const g = grant!;
@@ -176,7 +175,7 @@ export function GrantCard({
             {actionError && !pending ? <ErrorNotice error={actionError} /> : null}
 
             <div className="stack stack--tight">
-              <div className="row">
+              <ActionRow readOnly={!address}>
                 <button
                   type="button"
                   className="button--primary"
@@ -195,7 +194,7 @@ export function GrantCard({
                 >
                   Revoke
                 </button>
-              </div>
+              </ActionRow>
               {(!isBeneficiary || beforeCliff) && (
                 <div className="small muted">
                   {!isBeneficiary && "Only the beneficiary can claim."}

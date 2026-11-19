@@ -9,6 +9,7 @@ import { Address, Money } from "@/components/Money";
 import { usePositionPolling } from "@/components/PositionRegistry";
 import { PositionDetails, PositionRefresh } from "@/components/PositionCardTools";
 import { Figure, PositionCardShell } from "@/components/PositionCardShell";
+import { ActionRow } from "@/components/ReadOnly";
 import { Schedule } from "@/components/Schedule";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { usePositionCard } from "@/hooks/usePositionCard";
@@ -104,11 +105,9 @@ export function StreamCard({
   return (
     <PositionCardShell
       position={position}
-      address={address}
       loadError={loadError}
       loading={isLoading || !stream}
       onRetry={refresh}
-      noun="stream"
     >
       {() => {
         const s = stream!;
@@ -178,7 +177,7 @@ export function StreamCard({
             {actionError && !pending ? <ErrorNotice error={actionError} /> : null}
 
             <div className="stack stack--tight">
-              <div className="row">
+              <ActionRow readOnly={!address}>
                 <button
                   type="button"
                   className="button--primary"
@@ -213,7 +212,7 @@ export function StreamCard({
                 >
                   Cancel stream
                 </button>
-              </div>
+              </ActionRow>
               {(!isRecipient || available === null) && (
                 <div className="small muted">
                   {!isRecipient && "Only the recipient can withdraw from a stream."}

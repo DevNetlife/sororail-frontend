@@ -22,6 +22,7 @@ import {
 import { PositionCardState } from "@/components/PositionCardState";
 import { PositionDetails, PositionRefresh } from "@/components/PositionCardTools";
 import { PositionFilter, usePositionFilter } from "@/components/PositionFilter";
+import { ActionRow } from "@/components/ReadOnly";
 import { WhenLabel } from "@/components/Schedule";
 import { filterPositions } from "@/lib/position-filter";
 import type { Position } from "@/lib/positions";
@@ -137,14 +138,6 @@ function EscrowCard({ position }: { position: Position }) {
     );
   }
 
-  if (!address) {
-    return (
-      <div className="card">
-        <PositionHeader position={position} />
-        <p className="small muted">Connect a wallet to read this escrow.</p>
-      </div>
-    );
-  }
   if (loadError) {
     return (
       <div className="card stack stack--tight">
@@ -229,7 +222,7 @@ function EscrowCard({ position }: { position: Position }) {
       {actionError && !pending ? <ErrorNotice error={actionError} /> : null}
 
       <div className="stack stack--tight">
-        <div className="row">
+        <ActionRow readOnly={!address}>
           <button
             type="button"
             className="button--primary"
@@ -302,7 +295,7 @@ function EscrowCard({ position }: { position: Position }) {
               </button>
             </>
           )}
-        </div>
+        </ActionRow>
         {isBeneficiary && !isDepositor && escrow.state === "Funded" && (
           <div className="small muted">
             The beneficiary cannot release to themselves — that is the point of the escrow.

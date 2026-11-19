@@ -3,6 +3,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GrantCard } from "../src/components/GrantCard";
+import { READ_ONLY_REASON } from "../src/components/ReadOnly";
 import { RPC_URL } from "../src/lib/network";
 import type { Position } from "../src/lib/positions";
 
@@ -76,11 +77,14 @@ describe("GrantCard (#439)", () => {
     expect(screen.getByRole("button", { name: "Revoke" })).toBeDisabled();
   });
 
-  it("asks for a wallet before reading the grant", () => {
+  it("reads the grant without a wallet and makes its actions read-only (#446)", () => {
     walletAddress = null;
     render(<GrantCard position={position} />);
-    expect(screen.getByText("Connect a wallet to read this grant.")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Claim" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Connect a wallet to read/)).not.toBeInTheDocument();
+    expect(screen.getByText("Before cliff")).toBeInTheDocument();
+    expect(screen.getByText(READ_ONLY_REASON)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Claim" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Refresh" })).toBeEnabled();
   });
 
   it("refuses a position from a different network", () => {
