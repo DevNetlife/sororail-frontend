@@ -63,6 +63,12 @@ the wallet.
 - **Branching:** trunk-based, squash merge, linear history
 - **CI must be green to merge**, with no exceptions for maintainers
 
+## Dependency audit exceptions
+
+CI runs `pnpm audit --audit-level high` and fails on high or critical advisories. The job summary lists every advisory.
+If an advisory cannot be fixed yet, add its CVE to `pnpm.auditConfig.ignoreCves` in the root `package.json` in the same PR,
+with the reason in the PR description, and remove it once the dependency is updated.
+
 ## Security
 
 Do not report vulnerabilities through public issues. See [SECURITY.md](SECURITY.md).
