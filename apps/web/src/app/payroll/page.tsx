@@ -12,12 +12,8 @@ import { Confirm } from "@/components/Confirm";
 import { ContractLink } from "@/components/ContractLink";
 import { ErrorNotice, SuccessNotice } from "@/components/Feedback";
 import { Address, Money } from "@/components/Money";
-import {
-  BATCH_PAYOUT_CONTRACT,
-  NATIVE_TOKEN,
-  NETWORK_PASSPHRASE,
-  RPC_URL,
-} from "@/lib/network";
+import { BATCH_PAYOUT_CONTRACT, NATIVE_TOKEN } from "@/lib/network";
+import { useRpc } from "@/lib/rpc-provider";
 import {
   parseCsv,
   removeCsvLines,
@@ -66,15 +62,10 @@ export default function PayrollPage() {
     reader.readAsText(file);
   }, []);
 
+  const { clientOptions } = useRpc();
   const client = useMemo(
-    () =>
-      new BatchPayoutClient({
-        contractId: BATCH_PAYOUT_CONTRACT,
-        rpcUrl: RPC_URL,
-        networkPassphrase: NETWORK_PASSPHRASE,
-        ...(address ? { publicKey: address } : {}),
-      }),
-    [address],
+    () => new BatchPayoutClient(clientOptions(BATCH_PAYOUT_CONTRACT, address)),
+    [clientOptions, address],
   );
 
   // Read the cap rather than hardcoding: it is derived from network resource

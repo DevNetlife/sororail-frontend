@@ -316,9 +316,49 @@ export function renamePosition(contractId: string, label: string): void {
   );
 }
 
-/** Serialise the registry so it can be backed up or moved to another browser. */
+/**
+ * Largest backup `importPositions` will parse: 1 MiB, measured in characters
+ * (a lower bound on bytes). A real backup is a few KB; anything this large is
+ * the wrong file, and parsing it can freeze the tab (#443).
+ */
+export const MAX_IMPORT_SIZE = 1024 * 1024;
+
+/**
+ * Serialise the registry so it can be backed up or moved to another browser.
+ * The `version` field lets a later build refuse or upgrade the file instead of
+ * guessing at its shape.
+ */
 export function exportPositions(): string {
-  return JSON.stringify(read(), null, 2);
+  return JSON.stringify({ version: SCHEMA_VERSION, positions: read() }, null, 2);
+}
+
+/**
+ * The position array inside a backup: `{version, positions}` (current) or a
+ * bare array (backups written before the version field existed, treated as
+ * version 1). Throws on an unknown or newer version.
+ */
+function backupPositions(parsed: unknown): unknown[] {
+  if (Array.isArray(parsed)) return parsed;
+  if (typeof parsed !== "object" || parsed === null) {
+    throw new Error("Expected a SoroRail positions backup.");
+  }
+  const { version, positions } = parsed as Record<string, unknown>;
+  if (typeof version !== "number" || !Number.isInteger(version) || version < 1) {
+    throw new Error("This backup has no valid version number.");
+  }
+  if (version > SCHEMA_VERSION) {
+    throw new Error(
+      `This backup is schema version ${version}, but this app reads up to version ${SCHEMA_VERSION}. Update the app and try again.`,
+    );
+  }
+  if (!Array.isArray(positions)) {
+    throw new Error("Expected a JSON array of positions.");
+  }
+  const upgraded = migrate(positions, version);
+  if (!Array.isArray(upgraded)) {
+    throw new Error(`Backups of schema version ${version} cannot be read by this app.`);
+  }
+  return upgraded;
 }
 
 export interface ImportPositionsResult {
@@ -332,16 +372,18 @@ export interface ImportPositionsResult {
  * overwritten, so importing never silently discards a local rename.
  */
 export function importPositions(json: string): ImportPositionsResult {
+  if (json.length > MAX_IMPORT_SIZE) {
+    throw new Error(
+      `That file is too large to be a positions backup (limit ${MAX_IMPORT_SIZE / 1024} KB).`,
+    );
+  }
   let parsed: unknown;
   try {
     parsed = JSON.parse(json);
   } catch {
     throw new Error("That file is not valid JSON.");
   }
-  if (!Array.isArray(parsed)) {
-    throw new Error("Expected a JSON array of positions.");
-  }
-  const upgraded = parsed.map((item) => {
+  const upgraded = backupPositions(parsed).map((item) => {
     if (
       typeof item === "object" &&
       item !== null &&

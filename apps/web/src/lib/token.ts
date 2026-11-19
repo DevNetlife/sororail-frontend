@@ -7,7 +7,8 @@ import {
   scValToNative,
 } from "@stellar/stellar-sdk";
 
-import { NETWORK_PASSPHRASE, RPC_URL } from "./network";
+import { NETWORK_PASSPHRASE } from "./network";
+import { getDefaultRpc } from "./rpc";
 
 /**
  * Reads `decimals()` off a token contract.
@@ -19,8 +20,8 @@ import { NETWORK_PASSPHRASE, RPC_URL } from "./network";
 export async function fetchTokenDecimals(
   tokenId: string,
   sourceAddress: string,
+  server: rpc.Server = getDefaultRpc().server,
 ): Promise<number> {
-  const server = new rpc.Server(RPC_URL);
   const transaction = new TransactionBuilder(new Account(sourceAddress, "0"), {
     fee: BASE_FEE,
     networkPassphrase: NETWORK_PASSPHRASE,

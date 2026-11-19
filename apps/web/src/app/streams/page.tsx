@@ -20,6 +20,7 @@ import type { Position } from "@/lib/positions";
 import { RPC_URL } from "@/lib/network";
 import { useWallet } from "@/lib/wallet";
 import { usePositionCard } from "@/hooks/usePositionCard";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 
 export default function StreamsPage() {
   const positions = usePositions("stream");
@@ -64,11 +65,9 @@ export default function StreamsPage() {
 function StreamCard({ position }: { position: Position }) {
   const { address, signer } = useWallet();
   const [available, setAvailable] = useState<bigint | null>(null);
-  const [actionError, setActionError] = useState<unknown>(null);
   const [pending, setPending] = useState<"withdraw" | "cancel" | "topUp" | "extend" | null>(null);
   const [topUpAmount, setTopUpAmount] = useState("");
   const [extendDate, setExtendDate] = useState("");
-  const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<{ text: string; hash: string } | null>(null);
   const [now, setNow] = useState<bigint>(() => BigInt(Math.floor(Date.now() / 1000)));
 
@@ -98,45 +97,39 @@ function StreamCard({ position }: { position: Position }) {
     return () => clearInterval(id);
   }, []);
 
-  async function run(action: "withdraw" | "cancel" | "topUp" | "extend") {
+  const {
+    run,
+    busy,
+    error: actionError,
+    reset: clearActionError,
+  } = useAsyncAction(async (action: "withdraw" | "cancel" | "topUp" | "extend") => {
     if (!signer) {
-      setActionError(
-        new SigningError("Wallet disconnected. Reconnect to continue."),
-      );
-      return;
+      throw new SigningError("Wallet disconnected. Reconnect to continue.");
     }
-    setBusy(true);
-    setActionError(null);
-    try {
-      let call;
-      let successText: string;
-      if (action === "withdraw") {
-        call = await client.withdraw();
-        successText = "Withdrew accrued funds.";
-      } else if (action === "cancel") {
-        call = await client.cancel();
-        successText = "Stream cancelled.";
-      } else if (action === "topUp") {
-        const stroops = BigInt(Math.round(parseFloat(topUpAmount) * 1e7));
-        call = await client.topUp(stroops);
-        successText = "Stream topped up.";
-      } else {
-        const ts = BigInt(Math.floor(new Date(extendDate).getTime() / 1000));
-        call = await client.extend(ts);
-        successText = "Stream end date extended.";
-      }
-      const sent = await call.signAndSend(signer);
-      setDone({ text: successText, hash: sent.hash });
-      setPending(null);
-      setTopUpAmount("");
-      setExtendDate("");
-      await refresh();
-    } catch (error) {
-      setActionError(error);
-    } finally {
-      setBusy(false);
+    let call;
+    let successText: string;
+    if (action === "withdraw") {
+      call = await client.withdraw();
+      successText = "Withdrew accrued funds.";
+    } else if (action === "cancel") {
+      call = await client.cancel();
+      successText = "Stream cancelled.";
+    } else if (action === "topUp") {
+      const stroops = BigInt(Math.round(parseFloat(topUpAmount) * 1e7));
+      call = await client.topUp(stroops);
+      successText = "Stream topped up.";
+    } else {
+      const ts = BigInt(Math.floor(new Date(extendDate).getTime() / 1000));
+      call = await client.extend(ts);
+      successText = "Stream end date extended.";
     }
-  }
+    const sent = await call.signAndSend(signer);
+    setDone({ text: successText, hash: sent.hash });
+    setPending(null);
+    setTopUpAmount("");
+    setExtendDate("");
+    await refresh();
+  });
 
   if (position.network && position.network !== RPC_URL) {
     return (
@@ -323,7 +316,7 @@ function StreamCard({ position }: { position: Position }) {
           onConfirm={() => void run("withdraw")}
           onCancel={() => {
             setPending(null);
-            setActionError(null);
+            clearActionError();
           }}
         />
       ) : null}
@@ -356,7 +349,7 @@ function StreamCard({ position }: { position: Position }) {
           onCancel={() => {
             setPending(null);
             setTopUpAmount("");
-            setActionError(null);
+            clearActionError();
           }}
         />
       ) : null}
@@ -386,7 +379,7 @@ function StreamCard({ position }: { position: Position }) {
           onCancel={() => {
             setPending(null);
             setExtendDate("");
-            setActionError(null);
+            clearActionError();
           }}
         />
       ) : null}
@@ -422,7 +415,7 @@ function StreamCard({ position }: { position: Position }) {
           onConfirm={() => void run("cancel")}
           onCancel={() => {
             setPending(null);
-            setActionError(null);
+            clearActionError();
           }}
         />
       ) : null}

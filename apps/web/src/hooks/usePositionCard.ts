@@ -1,13 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Position } from "@/lib/positions";
-import { NETWORK_PASSPHRASE, RPC_URL } from "@/lib/network";
-
-interface ClientOptions {
-  contractId: string;
-  rpcUrl: string;
-  networkPassphrase: string;
-  publicKey?: string;
-}
+import { RPC_URL } from "@/lib/network";
+import type { ContractClientOptions as ClientOptions } from "@/lib/rpc";
+import { useRpc } from "@/lib/rpc-provider";
 
 interface PositionClient {
   get(): Promise<unknown>;
@@ -25,15 +20,13 @@ export function usePositionCard<ClientType extends PositionClient>(
   const [isLoading, setIsLoading] = useState(true);
   const activeRequestIdRef = useRef(0);
 
+  const { clientOptions } = useRpc();
+  // Memoised by contract id, signer and network (the provider's RPC), so the
+  // client keeps its identity across re-renders and its caches and effects
+  // are not reset on every render (#442).
   const client = useMemo(
-    () =>
-      new ClientConstructor({
-        contractId: position.contractId,
-        rpcUrl: RPC_URL,
-        networkPassphrase: NETWORK_PASSPHRASE,
-        ...(address ? { publicKey: address } : {}),
-      }),
-    [ClientConstructor, position.contractId, address],
+    () => new ClientConstructor(clientOptions(position.contractId, address)),
+    [ClientConstructor, clientOptions, position.contractId, address],
   );
 
   const refresh = useCallback(async () => {

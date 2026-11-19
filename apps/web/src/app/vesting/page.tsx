@@ -20,6 +20,7 @@ import type { Position } from "@/lib/positions";
 import { RPC_URL } from "@/lib/network";
 import { useWallet } from "@/lib/wallet";
 import { usePositionCard } from "@/hooks/usePositionCard";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 
 export default function VestingPage() {
   const positions = usePositions("vesting");
@@ -55,9 +56,7 @@ export default function VestingPage() {
 function GrantCard({ position }: { position: Position }) {
   const { address, signer } = useWallet();
   const [claimable, setClaimable] = useState<bigint | null>(null);
-  const [actionError, setActionError] = useState<unknown>(null);
   const [pending, setPending] = useState<"claim" | "revoke" | null>(null);
-  const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<{ text: string; hash: string } | null>(null);
   const [now, setNow] = useState<bigint>(() => BigInt(Math.floor(Date.now() / 1000)));
 
@@ -92,33 +91,27 @@ function GrantCard({ position }: { position: Position }) {
     return () => clearInterval(id);
   }, []);
 
-  async function run(action: "claim" | "revoke") {
+  const {
+    run,
+    busy,
+    error: actionError,
+    reset: clearActionError,
+  } = useAsyncAction(async (action: "claim" | "revoke") => {
     if (!signer) {
-      setActionError(
-        new SigningError("Wallet disconnected. Reconnect to continue."),
-      );
-      return;
+      throw new SigningError("Wallet disconnected. Reconnect to continue.");
     }
-    setBusy(true);
-    setActionError(null);
-    try {
-      const call = action === "claim" ? await client.claim() : await client.revoke();
-      const sent = await call.signAndSend(signer);
-      setDone({
-        text:
-          action === "claim"
-            ? "Claimed vested tokens."
-            : "Grant revoked. The vested portion stays claimable.",
-        hash: sent.hash,
-      });
-      setPending(null);
-      await refresh();
-    } catch (error) {
-      setActionError(error);
-    } finally {
-      setBusy(false);
-    }
-  }
+    const call = action === "claim" ? await client.claim() : await client.revoke();
+    const sent = await call.signAndSend(signer);
+    setDone({
+      text:
+        action === "claim"
+          ? "Claimed vested tokens."
+          : "Grant revoked. The vested portion stays claimable.",
+      hash: sent.hash,
+    });
+    setPending(null);
+    await refresh();
+  });
 
   if (position.network && position.network !== RPC_URL) {
     return (
@@ -283,7 +276,7 @@ function GrantCard({ position }: { position: Position }) {
           onConfirm={() => void run("claim")}
           onCancel={() => {
             setPending(null);
-            setActionError(null);
+            clearActionError();
           }}
         />
       ) : null}
@@ -312,7 +305,7 @@ function GrantCard({ position }: { position: Position }) {
           onConfirm={() => void run("revoke")}
           onCancel={() => {
             setPending(null);
-            setActionError(null);
+            clearActionError();
           }}
         />
       ) : null}
