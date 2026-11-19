@@ -4,6 +4,7 @@ import { EscrowClient, StreamClient, VestingClient } from "@sororail/sdk";
 import { useState, type FormEvent } from "react";
 
 import { ErrorNotice, SuccessNotice } from "@/components/Feedback";
+import { useTokenMetadata, type TokenMetadataState } from "@/hooks/useTokenMetadata";
 import { NATIVE_TOKEN } from "@/lib/network";
 import { addPosition, looksLikeContractId, type PositionKind } from "@/lib/positions";
 import { useRpc } from "@/lib/rpc-provider";
@@ -23,6 +24,7 @@ export function CreatePositionForm({
   const { address, signer } = useWallet();
   const { clientOptions } = useRpc();
   const [contractId, setContractId] = useState("");
+  const [token, setToken] = useState<string>(NATIVE_TOKEN);
   const [counterparty, setCounterparty] = useState("");
   const [arbiter, setArbiter] = useState("");
   const [amount, setAmount] = useState("");
@@ -35,6 +37,12 @@ export function CreatePositionForm({
   const [error, setError] = useState<unknown>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [success, setSuccess] = useState<{ hash: string; saved: boolean } | null>(null);
+
+  // #412 — the native token is known; any other pasted contract is read for its symbol, name and decimals.
+  const tokenTrimmed = token.trim();
+  const customToken =
+    tokenTrimmed !== NATIVE_TOKEN && looksLikeContractId(tokenTrimmed) ? tokenTrimmed : undefined;
+  const tokenMetadata = useTokenMetadata(customToken);
 
   const clearFieldError = (fieldName: string) => {
     if (fieldErrors[fieldName]) {
@@ -53,6 +61,16 @@ export function CreatePositionForm({
       errors.contractId = "Contract address is required.";
     } else if (!looksLikeContractId(contractId.trim())) {
       errors.contractId = "Enter the address of a deployed, uninitialized contract.";
+    }
+
+    if (!tokenTrimmed) {
+      errors.token = "Token contract address is required.";
+    } else if (!looksLikeContractId(tokenTrimmed)) {
+      errors.token = "Enter a token contract address (starts with C).";
+    } else if (customToken && tokenMetadata.status === "error") {
+      errors.token = "That contract is not a token. Check the address.";
+    } else if (customToken && tokenMetadata.status !== "ready") {
+      errors.token = "Still reading the token. Try again in a moment.";
     }
 
     const counterpartyLabel = kind === "stream" ? "Recipient" : "Beneficiary";
@@ -134,7 +152,7 @@ export function CreatePositionForm({
         call = await new StreamClient(options).create({
           sender: address,
           recipient: requiredAddress(counterparty, "Recipient"),
-          token: NATIVE_TOKEN,
+          token: tokenTrimmed,
           ratePerSecond: positiveInteger(rate, "Rate"),
           start: BigInt(Math.floor(Date.now() / 1000)),
           stop: BigInt(Math.floor(Date.now() / 1000)) + seconds,
@@ -146,7 +164,7 @@ export function CreatePositionForm({
         call = await new VestingClient(options).create({
           grantor: address,
           beneficiary: requiredAddress(counterparty, "Beneficiary"),
-          token: NATIVE_TOKEN,
+          token: tokenTrimmed,
           total: positiveInteger(amount, "Amount"),
           start: BigInt(Math.floor(Date.now() / 1000)),
           cliff: cliffSeconds,
@@ -159,7 +177,7 @@ export function CreatePositionForm({
           depositor: address,
           beneficiary: requiredAddress(counterparty, "Beneficiary"),
           arbiter: arbiter.trim() || null,
-          token: NATIVE_TOKEN,
+          token: tokenTrimmed,
           amount: positiveInteger(amount, "Amount"),
           deadline: now + positiveInteger(duration, "Deadline offset"),
         });
@@ -191,6 +209,17 @@ export function CreatePositionForm({
         required
         error={fieldErrors.contractId}
       />
+      <Field
+        label="Token contract address"
+        value={token}
+        onChange={(val) => {
+          setToken(val);
+          clearFieldError("token");
+        }}
+        required
+        error={fieldErrors.token}
+      />
+      <TokenPreview token={tokenTrimmed} state={tokenMetadata} />
       <Field
         label={kind === "stream" ? "Recipient address" : "Beneficiary address"}
         value={counterparty}
@@ -318,6 +347,44 @@ function Field({
       ) : null}
     </div>
   );
+}
+
+/**
+ * What the pasted token contract is (#412): symbol, name and decimals once read,
+ * a loading line while reading, and a plain error for a contract that does not
+ * answer the token interface. The native token needs no read.
+ */
+function TokenPreview({ token, state }: { token: string; state: TokenMetadataState }) {
+  if (token === NATIVE_TOKEN) {
+    return (
+      <p className="small muted m-0" data-testid="token-preview">
+        XLM · Stellar Lumens (native) · 7 decimals
+      </p>
+    );
+  }
+  if (state.status === "loading") {
+    return (
+      <p className="small muted m-0" role="status">
+        Reading token details…
+      </p>
+    );
+  }
+  if (state.status === "ready") {
+    const { symbol, name, decimals } = state.metadata;
+    return (
+      <p className="small muted m-0" data-testid="token-preview">
+        {symbol} · {name} · {decimals} decimals
+      </p>
+    );
+  }
+  if (state.status === "error") {
+    return (
+      <p className="field__error m-0" role="alert">
+        That contract does not answer symbol(), name() and decimals(), so it is not a token.
+      </p>
+    );
+  }
+  return null;
 }
 
 function positiveInteger(value: string, name: string): bigint {

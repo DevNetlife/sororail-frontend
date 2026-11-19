@@ -1,8 +1,9 @@
 "use client";
 
 import { memo, useState } from "react";
-import { formatAmount } from "@sororail/sdk";
 
+import { useTokenMetadata } from "@/hooks/useTokenMetadata";
+import { formatTokenAmount } from "@/lib/format";
 import { shortAddress } from "@/lib/network";
 
 export interface MoneyProps {
@@ -22,29 +23,51 @@ export interface MoneyProps {
   approximate?: boolean;
   /** The token's decimals; omit for the classic 7. */
   decimals?: number | undefined;
+  /**
+   * The token contract id (#411). When set, the token's own `symbol()` is shown
+   * (its `name()` in the tooltip) instead of `unit`, so an amount in a
+   * non-native token is never ambiguous. A token whose metadata can't be read
+   * degrades to its shortened contract id.
+   */
+  token?: string | undefined;
 }
 
-/**
- * #76 — Derive the display locale from the browser once at module scope so
- * every `formatAmount` call uses the visitor's grouping/decimal conventions
- * instead of always defaulting to "en-US".
- */
-const BROWSER_LOCALE =
-  typeof navigator !== "undefined" ? navigator.language : "en-US";
+/** The unit label for a token contract: its symbol once read, `fallback` while loading, its id on failure. */
+function TokenUnit({ token, fallback }: { token: string; fallback?: string }) {
+  const state = useTokenMetadata(token);
+  if (state.status === "ready") {
+    return (
+      <span className="amount__unit" title={state.metadata.name}>
+        {state.metadata.symbol}
+      </span>
+    );
+  }
+  const id = shortAddress(token, 4);
+  if (state.status === "error") {
+    return (
+      <span className="amount__unit" title={token}>
+        {id}
+      </span>
+    );
+  }
+  return <span className="amount__unit">{fallback ?? id}</span>;
+}
 
 /**
  * A monetary figure.
  *
  * Amounts get more typographic weight than the labels around them and use
- * tabular figures so a column of them lines up digit for digit.
+ * tabular figures so a column of them lines up digit for digit. Digits and
+ * separators follow the viewer's locale through `lib/format` (#410).
  */
 export const Money = memo(function Money({
   value,
-  unit = "XLM",
+  unit,
   size,
   direction,
   approximate = false,
   decimals,
+  token,
 }: MoneyProps) {
   const classes = [
     "amount",
@@ -67,8 +90,12 @@ export const Money = memo(function Money({
           <span className="sr-only">At least </span>
         </>
       ) : null}
-      {formatAmount(value, { locale: BROWSER_LOCALE })}
-      <span className="amount__unit">{unit}</span>
+      {formatTokenAmount(value, decimals ?? 7)}
+      {token ? (
+        <TokenUnit token={token} {...(unit === undefined ? {} : { fallback: unit })} />
+      ) : (
+        <span className="amount__unit">{unit ?? "XLM"}</span>
+      )}
     </span>
   );
 });
