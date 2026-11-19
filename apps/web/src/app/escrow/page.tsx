@@ -24,6 +24,7 @@ import { PositionDetails, PositionRefresh } from "@/components/PositionCardTools
 import { PositionFilter, usePositionFilter } from "@/components/PositionFilter";
 import { ActionRow } from "@/components/ReadOnly";
 import { WhenLabel } from "@/components/Schedule";
+import { EscrowCountdown } from "@/components/EscrowCountdown";
 import { filterPositions } from "@/lib/position-filter";
 import type { Position } from "@/lib/positions";
 import { RPC_URL } from "@/lib/network";
@@ -92,6 +93,15 @@ function EscrowCard({ position }: { position: Position }) {
     void refresh();
   }, [refresh]);
   usePositionPolling(refresh);
+
+  // Tick every second so the countdown stays live.
+  useEffect(() => {
+    const id = setInterval(
+      () => setNow(BigInt(Math.floor(Date.now() / 1000))),
+      1_000,
+    );
+    return () => clearInterval(id);
+  }, []);
 
   async function run(action: Action) {
     if (!signer || !address) {
@@ -191,6 +201,7 @@ function EscrowCard({ position }: { position: Position }) {
           <div>
             <WhenLabel at={escrow.deadline} now={now} />
           </div>
+          <EscrowCountdown deadline={escrow.deadline} now={now} />
           <div className="small muted">
             {pastDeadline
               ? "The depositor can now refund unilaterally."
