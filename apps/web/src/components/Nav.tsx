@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { NetworkBadge } from "@/components/NetworkBadge";
 import { shortAddress } from "@/lib/network";
 import { useWallet } from "@/lib/wallet";
 
@@ -16,7 +17,7 @@ const links = [
 
 export function Nav() {
   const pathname = usePathname();
-  const { address, connect, disconnect, connecting, error, networkError } =
+  const { address, connect, disconnect, connecting, error, networkError, accountSwitch } =
     useWallet();
 
   return (
@@ -41,6 +42,8 @@ export function Nav() {
         })}
 
         <div className="nav__spacer" />
+
+        <NetworkBadge />
 
         {address ? (
           <div className="row">
@@ -67,6 +70,35 @@ export function Nav() {
         <div className="nav__inner nav__feedback">
           <div className="notice notice--error" role="alert">
             <div>{error.message}</div>
+          </div>
+        </div>
+      ) : null}
+
+      {accountSwitch && !address ? (
+        <div className="nav__inner nav__feedback">
+          <div className="notice notice--warn" role="alert">
+            <div className="notice__title">Freighter account changed</div>
+            <div className="notice__detail">
+              Freighter switched from{" "}
+              <span className="addr" title={accountSwitch.previous}>
+                {shortAddress(accountSwitch.previous, 6)}
+              </span>{" "}
+              to{" "}
+              <span className="addr" title={accountSwitch.current}>
+                {shortAddress(accountSwitch.current, 6)}
+              </span>
+              . Nothing will be signed until you reconnect.
+            </div>
+            <div className="row">
+              <button
+                type="button"
+                className="button--primary"
+                onClick={() => void connect()}
+                disabled={connecting}
+              >
+                Reconnect as {shortAddress(accountSwitch.current, 6)}
+              </button>
+            </div>
           </div>
         </div>
       ) : null}

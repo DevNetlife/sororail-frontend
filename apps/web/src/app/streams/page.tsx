@@ -16,6 +16,8 @@ import {
 } from "@/components/PositionRegistry";
 import { PositionCardState } from "@/components/PositionCardState";
 import { Schedule } from "@/components/Schedule";
+import { StatusFilter, useStatusFilter } from "@/components/StatusFilter";
+import { isVisible, streamStatus, type PositionStatus } from "@/lib/position-status";
 import type { Position } from "@/lib/positions";
 import { RPC_URL } from "@/lib/network";
 import { useWallet } from "@/lib/wallet";
@@ -24,6 +26,7 @@ import { usePositionCard } from "@/hooks/usePositionCard";
 export default function StreamsPage() {
   const positions = usePositions("stream");
   const [hydrated, setHydrated] = useState(false);
+  const { filter, setFilter, statuses, report } = useStatusFilter();
 
   useEffect(() => setHydrated(true), []);
 
@@ -50,9 +53,17 @@ export default function StreamsPage() {
           </EmptyState>
         </div>
       ) : (
-        positions.map((position) => (
-          <StreamCard key={position.contractId} position={position} />
-        ))
+        <>
+          <StatusFilter value={filter} onChange={setFilter} statuses={statuses} label="Filter streams by status" />
+          {positions.map((position) => (
+            <StreamCard
+              key={position.contractId}
+              position={position}
+              onStatus={report}
+              hidden={!isVisible(statuses[position.contractId], filter)}
+            />
+          ))}
+        </>
       )}
 
       <CreatePositionForm kind="stream" />
@@ -61,7 +72,15 @@ export default function StreamsPage() {
   );
 }
 
-function StreamCard({ position }: { position: Position }) {
+function StreamCard({
+  position,
+  onStatus,
+  hidden = false,
+}: {
+  position: Position;
+  onStatus?: (contractId: string, status: PositionStatus) => void;
+  hidden?: boolean;
+}) {
   const { address, signer } = useWallet();
   const [available, setAvailable] = useState<bigint | null>(null);
   const [actionError, setActionError] = useState<unknown>(null);
@@ -88,6 +107,11 @@ function StreamCard({ position }: { position: Position }) {
 
   useEffect(() => { void refresh(); }, [refresh]);
   usePositionPolling(refresh);
+
+  const status = stream ? streamStatus(stream, now) : undefined;
+  useEffect(() => {
+    if (status && onStatus) onStatus(position.contractId, status);
+  }, [status, onStatus, position.contractId]);
 
   // Keep the clock moving so the schedule and accrual stay honest on screen.
   useEffect(() => {
@@ -137,6 +161,8 @@ function StreamCard({ position }: { position: Position }) {
       setBusy(false);
     }
   }
+
+  if (hidden) return null;
 
   if (position.network && position.network !== RPC_URL) {
     return (

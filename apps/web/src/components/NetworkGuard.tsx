@@ -4,6 +4,10 @@ import { useEffect, useState, type ReactNode } from "react";
 
 import { NETWORK_PASSPHRASE, RPC_URL } from "@/lib/network";
 
+/** Shown by the guard when the RPC is not testnet, and as the nav network badge's help text (#429). */
+export const NETWORK_GUARD_HELP =
+  "This app is unavailable because the configured RPC endpoint is not the Stellar testnet. Check NEXT_PUBLIC_RPC_URL and try again.";
+
 export function NetworkGuard({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<"checking" | "ready" | "error">("checking");
 
@@ -44,12 +48,7 @@ export function NetworkGuard({ children }: { children: ReactNode }) {
 
   if (status === "checking") return <p>Validating testnet connection…</p>;
   if (status === "error") {
-    return (
-      <p role="alert">
-        This app is unavailable because the configured RPC endpoint is not the
-        Stellar testnet. Check NEXT_PUBLIC_RPC_URL and try again.
-      </p>
-    );
+    return <p role="alert">{NETWORK_GUARD_HELP}</p>;
   }
   return children;
 }

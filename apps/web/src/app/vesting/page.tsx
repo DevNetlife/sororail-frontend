@@ -16,6 +16,8 @@ import {
 } from "@/components/PositionRegistry";
 import { PositionCardState } from "@/components/PositionCardState";
 import { Schedule } from "@/components/Schedule";
+import { StatusFilter, useStatusFilter } from "@/components/StatusFilter";
+import { grantStatus, isVisible, type PositionStatus } from "@/lib/position-status";
 import type { Position } from "@/lib/positions";
 import { RPC_URL } from "@/lib/network";
 import { useWallet } from "@/lib/wallet";
@@ -23,6 +25,7 @@ import { usePositionCard } from "@/hooks/usePositionCard";
 
 export default function VestingPage() {
   const positions = usePositions("vesting");
+  const { filter, setFilter, statuses, report } = useStatusFilter();
 
   return (
     <div className="stack">
@@ -41,9 +44,17 @@ export default function VestingPage() {
           </EmptyState>
         </div>
       ) : (
-        positions.map((position) => (
-          <GrantCard key={position.contractId} position={position} />
-        ))
+        <>
+          <StatusFilter value={filter} onChange={setFilter} statuses={statuses} label="Filter grants by status" />
+          {positions.map((position) => (
+            <GrantCard
+              key={position.contractId}
+              position={position}
+              onStatus={report}
+              hidden={!isVisible(statuses[position.contractId], filter)}
+            />
+          ))}
+        </>
       )}
 
       <CreatePositionForm kind="vesting" />
@@ -52,7 +63,15 @@ export default function VestingPage() {
   );
 }
 
-function GrantCard({ position }: { position: Position }) {
+function GrantCard({
+  position,
+  onStatus,
+  hidden = false,
+}: {
+  position: Position;
+  onStatus?: (contractId: string, status: PositionStatus) => void;
+  hidden?: boolean;
+}) {
   const { address, signer } = useWallet();
   const [claimable, setClaimable] = useState<bigint | null>(null);
   const [actionError, setActionError] = useState<unknown>(null);
@@ -83,6 +102,11 @@ function GrantCard({ position }: { position: Position }) {
     void refresh();
   }, [refresh]);
   usePositionPolling(refresh);
+
+  const status = grant ? grantStatus(grant, now) : undefined;
+  useEffect(() => {
+    if (status && onStatus) onStatus(position.contractId, status);
+  }, [status, onStatus, position.contractId]);
 
   useEffect(() => {
     const id = setInterval(
@@ -119,6 +143,8 @@ function GrantCard({ position }: { position: Position }) {
       setBusy(false);
     }
   }
+
+  if (hidden) return null;
 
   if (position.network && position.network !== RPC_URL) {
     return (
