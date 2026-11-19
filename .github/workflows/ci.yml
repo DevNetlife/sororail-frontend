@@ -51,6 +51,7 @@ jobs:
       - run: pnpm --filter @sororail/sdk typecheck:examples
       - run: pnpm typecheck
       - run: pnpm lint
+      - run: pnpm format:check
       # Dead code: unused files, exports and dependencies across the workspace. Pinned to major 5.
       - run: pnpm knip
       # Playwright needs a built app and its own browser download.

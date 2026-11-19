@@ -11,17 +11,28 @@
     "preinstall": "npx only-allow pnpm",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
-    "lint": "pnpm -r lint",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "docs:api": "pnpm --filter @sororail/sdk docs:api",
     "changeset": "changeset",
     "version-packages": "changeset version",
     "release": "pnpm build && changeset publish",
-    "knip": "pnpm dlx knip@5"
+    "knip": "pnpm dlx knip@5",
+    "prepare": "husky install"
   },
   "devDependencies": {
     "@changesets/cli": "^3.0.2",
+    "@eslint/js": "^9.14.0",
     "@playwright/test": "^1.63.0",
-    "typescript": "^5.7.2"
+    "eslint": "^9.14.0",
+    "eslint-plugin-react": "^7.37.2",
+    "eslint-plugin-react-hooks": "^4.6.2",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.2.11",
+    "prettier": "^3.3.3",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.17.0"
   },
   "pnpm": {
     "auditConfig": {
