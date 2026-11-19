@@ -58,13 +58,48 @@ export function splitCsvLine(line: string): string[] {
   return fields;
 }
 
+const HEADER_ADDRESS_NAMES = new Set(["address", "account", "recipient", "to", "wallet"]);
+const HEADER_AMOUNT_NAMES = new Set(["amount", "value", "payout"]);
+
+/**
+ * Spreadsheets paste as tab-separated values; a line with tabs and no commas
+ * is split on tabs, everything else is parsed as CSV.
+ */
+function splitRow(raw: string): string[] {
+  if (raw.includes("\t") && !raw.includes(",")) {
+    return raw.split("\t").map((field) => field.trim());
+  }
+  return splitCsvLine(raw);
+}
+
+/** True for a header such as `address,amount` (names are case-insensitive). */
+export function isHeaderRow(parts: readonly string[]): boolean {
+  const address = (parts[0] ?? "").trim().toLowerCase();
+  const amount = (parts[1] ?? "").trim().toLowerCase();
+  return HEADER_ADDRESS_NAMES.has(address) && HEADER_AMOUNT_NAMES.has(amount);
+}
+
+/** The CSV a user downloads as a starting point. Comment lines are ignored on upload. */
+export function buildPayrollTemplate(): string {
+  return [
+    "address,amount",
+    "# One recipient per line. Lines starting with # are ignored.",
+    "# G...,12.50",
+    "",
+  ].join("\n");
+}
+
 export function parseCsv(text: string, decimals?: number): ParsedLine[] {
-  return text
+  const rows = text
     .split("\n")
     .map((raw, index) => ({ raw: raw.trim(), index }))
-    .filter(({ raw }) => raw.length > 0 && !raw.startsWith("#"))
+    .filter(({ raw }) => raw.length > 0 && !raw.startsWith("#"));
+  // A header row is not a recipient. Only the first row can be one.
+  const body =
+    rows.length > 0 && isHeaderRow(splitRow(rows[0].raw)) ? rows.slice(1) : rows;
+  return body
     .map(({ raw, index }): ParsedLine => {
-      const parts = splitCsvLine(raw);
+      const parts = splitRow(raw);
       const line = index + 1;
 
       if (parts.length > 2) {
