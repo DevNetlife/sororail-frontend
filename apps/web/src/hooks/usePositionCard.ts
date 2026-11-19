@@ -23,6 +23,9 @@ export function usePositionCard<ClientType extends PositionClient>(
   const [data, setData] = useState<DataType | null>(null);
   const [loadError, setLoadError] = useState<unknown>(null);
   const [isLoading, setIsLoading] = useState(true);
+  // When the data was last read from the chain, and whether a read is in flight (#426).
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const activeRequestIdRef = useRef(0);
 
   const client = useMemo(
@@ -41,11 +44,13 @@ export function usePositionCard<ClientType extends PositionClient>(
     if (position.network && position.network !== RPC_URL) return;
     const requestId = ++activeRequestIdRef.current;
     const isCurrent = () => requestId === activeRequestIdRef.current;
+    setIsRefreshing(true);
     try {
       const result = (await client.get()) as DataType;
       if (!isCurrent()) return;
       setData(result);
       setLoadError(null);
+      setLastUpdatedAt(Date.now());
       if (onRefresh) {
         await onRefresh(client, isCurrent);
       }
@@ -53,7 +58,10 @@ export function usePositionCard<ClientType extends PositionClient>(
       if (!isCurrent()) return;
       setLoadError(error);
     } finally {
-      if (isCurrent()) setIsLoading(false);
+      if (isCurrent()) {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
     }
   }, [client, address, position.network, onRefresh]);
 
@@ -64,5 +72,5 @@ export function usePositionCard<ClientType extends PositionClient>(
     };
   }, [refresh]);
 
-  return { data, loadError, client, refresh, isLoading };
+  return { data, loadError, client, refresh, isLoading, isRefreshing, lastUpdatedAt };
 }

@@ -12,6 +12,7 @@ import { Confirm } from "@/components/Confirm";
 import { ContractLink } from "@/components/ContractLink";
 import { ErrorNotice, SuccessNotice } from "@/components/Feedback";
 import { Address, Money } from "@/components/Money";
+import { PayrollFee } from "@/components/PayrollFee";
 import {
   BATCH_PAYOUT_CONTRACT,
   NATIVE_TOKEN,
@@ -24,6 +25,7 @@ import {
   splitPayrollPayments,
   type ParsedLine,
 } from "@/lib/payroll";
+import { estimatePayrollFee, type PayrollFeeEstimate } from "@/lib/payroll-fee";
 import { fetchTokenDecimals } from "@/lib/token";
 import { useWallet } from "@/lib/wallet";
 
@@ -35,6 +37,11 @@ export default function PayrollPage() {
   const [cap, setCap] = useState<number | null>(null);
   const [capError, setCapError] = useState<unknown>(null);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
+  const [feeEstimate, setFeeEstimate] = useState<PayrollFeeEstimate | null>(null);
+  // The fee estimate belongs to the preview it was computed with.
+  useEffect(() => {
+    if (!receipt) setFeeEstimate(null);
+  }, [receipt]);
   const [previewError, setPreviewError] = useState<unknown>(null);
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -206,7 +213,15 @@ export default function PayrollPage() {
       for (const chunk of batches) {
         receipts.push(await client.preview(chunk));
       }
+      // Each chunk is its own transaction: total their simulated fees (#424).
+      const fee = address
+        ? await estimatePayrollFee(batches, async (chunk) => {
+            const call = await client.execute({ funder: address, token: NATIVE_TOKEN, recipients: chunk });
+            return (await call.simulateWithResources()).resources.resourceFee;
+          })
+        : null;
       if (seq === previewSeq.current) {
+        setFeeEstimate(fee);
         setReceipt({
           count: receipts.reduce((count, res) => count + res.count, 0),
           total: receipts.reduce((sum, res) => sum + res.total, 0n),
@@ -217,7 +232,7 @@ export default function PayrollPage() {
         setPreviewError(error);
       }
     }
-  }, [batches, client]);
+  }, [batches, client, address]);
 
   async function send() {
     if (!signer || !address) {
@@ -503,6 +518,7 @@ export default function PayrollPage() {
             <Money value={receipt.total} decimals={decimals ?? undefined} /> total. Nothing has been sent.
           </SuccessNotice>
         ) : null}
+        {receipt && feeEstimate ? <PayrollFee estimate={feeEstimate} /> : null}
         {sendError ? <ErrorNotice error={sendError} /> : null}
         {results.map((result) => (
           <SuccessNotice key={result.hash} hash={result.hash}>

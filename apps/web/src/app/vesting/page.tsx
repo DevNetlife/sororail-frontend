@@ -15,14 +15,19 @@ import {
   usePositions,
 } from "@/components/PositionRegistry";
 import { PositionCardState } from "@/components/PositionCardState";
+import { PositionDetails, PositionRefresh } from "@/components/PositionCardTools";
+import { PositionFilter, usePositionFilter } from "@/components/PositionFilter";
 import { Schedule } from "@/components/Schedule";
+import { filterPositions } from "@/lib/position-filter";
 import type { Position } from "@/lib/positions";
 import { RPC_URL } from "@/lib/network";
 import { useWallet } from "@/lib/wallet";
 import { usePositionCard } from "@/hooks/usePositionCard";
 
 export default function VestingPage() {
-  const positions = usePositions("vesting");
+  const allPositions = usePositions("vesting");
+  const [query, setQuery] = usePositionFilter();
+  const positions = filterPositions(allPositions, query);
 
   return (
     <div className="stack">
@@ -34,16 +39,23 @@ export default function VestingPage() {
         </p>
       </div>
 
-      {positions.length === 0 ? (
+      {allPositions.length === 0 ? (
         <div className="card">
           <EmptyState title="No grants tracked yet">
             Initialize a deployed vesting contract below, or track one that already exists.
           </EmptyState>
         </div>
       ) : (
-        positions.map((position) => (
-          <GrantCard key={position.contractId} position={position} />
-        ))
+        <>
+          <PositionFilter noun="grant" query={query} onChange={setQuery} shown={positions.length} total={allPositions.length} />
+          {positions.length === 0 ? (
+            <div className="card">
+              <EmptyState title="No grants match">Try a different name or address, or clear the search.</EmptyState>
+            </div>
+          ) : (
+            positions.map((position) => <GrantCard key={position.contractId} position={position} />)
+          )}
+        </>
       )}
 
       <CreatePositionForm kind="vesting" />
@@ -61,7 +73,7 @@ function GrantCard({ position }: { position: Position }) {
   const [done, setDone] = useState<{ text: string; hash: string } | null>(null);
   const [now, setNow] = useState<bigint>(() => BigInt(Math.floor(Date.now() / 1000)));
 
-  const { data: grant, loadError, client, refresh, isLoading } = usePositionCard(
+  const { data: grant, loadError, client, refresh, isLoading, isRefreshing, lastUpdatedAt } = usePositionCard(
     VestingClient,
     position,
     address,
@@ -169,6 +181,8 @@ function GrantCard({ position }: { position: Position }) {
   return (
     <div className="card stack stack--tight">
       <PositionHeader position={position} />
+      <PositionRefresh onRefresh={refresh} isRefreshing={isRefreshing} lastUpdatedAt={lastUpdatedAt} />
+      <PositionDetails kind="vesting" data={grant} />
 
       <div className="row">
         {grant.revokedAt ? (
