@@ -61,8 +61,10 @@
     monospace;
 }
 
+/* Dark palette — applied by prefers-color-scheme OR by the manual toggle
+   (data-theme="dark" on <html>, set by ThemeToggle and the anti-FOUC script). */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #171614;
     --surface: #1f1e1b;
     --surface-sunken: #14130f;
@@ -86,6 +88,38 @@
     --danger: #e08b76;
     --danger-wash: #2e1a15;
   }
+}
+
+/* Manual dark override — wins even when prefers-color-scheme is light. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #171614;
+  --surface: #1f1e1b;
+  --surface-sunken: #14130f;
+  --border: #33312c;
+  --border-strong: #4a473f;
+
+  --text: #f0ede7;
+  --text-muted: #a7a196;
+  --text-faint: #8e887c;
+
+  --accent: #5db895;
+  --accent-hover: #7ccbab;
+  --accent-contrast: #10201a;
+  --accent-wash: #1b2f28;
+
+  --incoming: #5db895;
+  --outgoing: #e08b76;
+
+  --warning: #d6b45f;
+  --warning-wash: #2b2513;
+  --danger: #e08b76;
+  --danger-wash: #2e1a15;
+}
+
+/* Manual light override — wins even when prefers-color-scheme is dark. */
+:root[data-theme="light"] {
+  color-scheme: light;
 }
 
 * {
