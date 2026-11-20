@@ -108,6 +108,88 @@ export function formatAmount(
 }
 
 /**
+ * Parses a user-typed amount string using the grouping and decimal separators
+ * of the given locale and returns a strict decimal string suitable for
+ * {@link toStroops}.
+ *
+ * Where `toStroops` only accepts plain `"1234.5"`-style strings (intentionally
+ * strict to prevent silent mistakes), this function is lenient: it strips
+ * locale-appropriate grouping characters, normalises the decimal character to
+ * `.`, and returns a canonical string.
+ *
+ * **Ambiguous input** (e.g. `"1,234"`) is resolved by the locale: in `en-US`
+ * the comma is a grouping separator so `"1,234"` → `"1234"`; in `de-DE` the
+ * comma is the decimal separator so `"1,234"` → `"1.234"`.
+ *
+ * Space-like separators (regular space, non-breaking space ` `, narrow
+ * no-break space ` `) are all accepted when the locale uses any of them
+ * as the grouping character — so `"1 234,5"` and `"1 234,5"` are
+ * equivalent for `fr-FR`.
+ *
+ * @param input  - User-typed string, e.g. `"1.234,5"` for de-DE
+ * @param locale - BCP-47 locale tag, defaults to `"en-US"`
+ * @returns A strict decimal string ready for {@link toStroops}
+ * @throws {ValidationError} When the input cannot be parsed as a number in the given locale
+ *
+ * @example
+ * parseAmountInput("1,234.50", "en-US") // → "1234.50"
+ * parseAmountInput("1.234,5",  "de-DE") // → "1234.5"
+ * parseAmountInput("1 234,5",  "fr-FR") // → "1234.5"
+ */
+export function parseAmountInput(input: string, locale = "en-US"): string {
+  let groupSep: string;
+  let decimalSep: string;
+  try {
+    const parts = new Intl.NumberFormat(locale).formatToParts(1_234_567.89);
+    groupSep = parts.find((p) => p.type === "group")?.value ?? "";
+    decimalSep = parts.find((p) => p.type === "decimal")?.value ?? ".";
+  } catch {
+    throw new ValidationError(`"${locale}" is not a recognised locale tag.`);
+  }
+
+  const trimmed = input.trim();
+  if (!trimmed) {
+    throw new ValidationError(`Amount cannot be empty.`);
+  }
+
+  // Strip grouping separators.  Space-like separators in the locale
+  // (narrow no-break space, non-breaking space, regular space) are treated
+  // interchangeably so hand-typed spaces work even when Intl emits  .
+  let normalised = trimmed;
+  if (groupSep) {
+    if (/[\s  ]/.test(groupSep)) {
+      normalised = normalised.replace(/[\s  ]/g, "");
+    } else {
+      const escaped = groupSep.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      normalised = normalised.replace(new RegExp(escaped, "g"), "");
+    }
+  }
+
+  // Normalise the decimal separator to ".".
+  if (decimalSep !== ".") {
+    const escapedDec = decimalSep.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const decCount = (normalised.match(new RegExp(escapedDec, "g")) ?? []).length;
+    if (decCount > 1) {
+      throw new ValidationError(
+        `"${input}" contains more than one "${decimalSep}" separator. ` +
+          `Use a plain decimal string such as "12.50".`,
+      );
+    }
+    normalised = normalised.replace(new RegExp(escapedDec), ".");
+  }
+
+  // Validate that the result is a well-formed decimal string.
+  if (!/^-?\d*(\.\d*)?$/.test(normalised) || !/\d/.test(normalised)) {
+    throw new ValidationError(
+      `"${input}" could not be parsed as a ${locale} amount. ` +
+        `Use a plain decimal string such as "12.50".`,
+    );
+  }
+
+  return normalised;
+}
+
+/**
  * Asserts an amount is strictly positive (> 0n), as every contract requires.
  *
  * @param amount - The amount to validate
