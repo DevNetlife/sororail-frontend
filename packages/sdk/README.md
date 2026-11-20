@@ -76,6 +76,32 @@ the final branch is a bug in the calling code, not a failed call.
 Amounts are `bigint`, never `number`. Use `toStroops` / `fromStroops` at the
 edges, and read `decimals()` off the token rather than assuming 7.
 
+## Subpath exports
+
+Importing from the package root (`@sororail/sdk`) pulls every client into
+the bundle. When a page only needs error types, conversion helpers, or a
+signer, use the dedicated subpath to keep the bundle small:
+
+| Subpath | Contents |
+|---|---|
+| `@sororail/sdk/errors` | `SororailError`, `ContractError`, `NetworkError`, `ValidationError`, error codes and helpers |
+| `@sororail/sdk/utils` | `toStroops`, `fromStroops`, `formatAmount`, `requirePositive`, `batchRead`, `batchReadSafe`, ScVal builders |
+| `@sororail/sdk/signers` | `KeypairSigner`, `FreighterSigner`, `SigningError`, `NetworkMismatchError` |
+
+```ts
+// Error-handling only — does not bundle any client.
+import { ContractError, ValidationError } from "@sororail/sdk/errors";
+
+// Amount helpers only.
+import { toStroops, fromStroops } from "@sororail/sdk/utils";
+
+// Signer only.
+import { FreighterSigner } from "@sororail/sdk/signers";
+```
+
+The root export (`@sororail/sdk`) re-exports everything and is the right
+choice when multiple concerns are needed in the same file.
+
 ## Examples
 
 Runnable, live-testnet examples for each contract are in
