@@ -4,6 +4,7 @@ import {
   STROOPS_DECIMALS,
   formatAmount,
   fromStroops,
+  parseAmountInput,
   requirePositive,
   toStroops,
 } from "../src/utils/amounts.js";
@@ -348,4 +349,107 @@ describe("requirePositive", () => {
 
 it("documents the default decimals", () => {
   expect(STROOPS_DECIMALS).toBe(7);
+});
+
+describe("parseAmountInput (#384)", () => {
+  describe("en-US (comma grouping, dot decimal)", () => {
+    it("passes a plain decimal string unchanged", () => {
+      expect(parseAmountInput("1234.5", "en-US")).toBe("1234.5");
+      expect(parseAmountInput("0.5", "en-US")).toBe("0.5");
+      expect(parseAmountInput("1234", "en-US")).toBe("1234");
+    });
+
+    it("strips comma grouping separators", () => {
+      expect(parseAmountInput("1,234.50", "en-US")).toBe("1234.50");
+      expect(parseAmountInput("1,000,000", "en-US")).toBe("1000000");
+      expect(parseAmountInput("1,234,567.89", "en-US")).toBe("1234567.89");
+    });
+
+    it("resolves ambiguous '1,234' as 1234 (comma = grouping in en-US)", () => {
+      expect(parseAmountInput("1,234", "en-US")).toBe("1234");
+    });
+
+    it("handles negative amounts", () => {
+      expect(parseAmountInput("-1,234.50", "en-US")).toBe("-1234.50");
+    });
+  });
+
+  describe("de-DE (dot grouping, comma decimal)", () => {
+    it("strips dot grouping and replaces comma decimal", () => {
+      expect(parseAmountInput("1.234,5", "de-DE")).toBe("1234.5");
+      expect(parseAmountInput("1.000.000,99", "de-DE")).toBe("1000000.99");
+    });
+
+    it("resolves ambiguous '1,234' as 1.234 (comma = decimal in de-DE)", () => {
+      expect(parseAmountInput("1,234", "de-DE")).toBe("1.234");
+    });
+
+    it("resolves '1.234' as 1234 (dot = grouping in de-DE)", () => {
+      expect(parseAmountInput("1.234", "de-DE")).toBe("1234");
+    });
+
+    it("handles negative amounts", () => {
+      expect(parseAmountInput("-1.234,5", "de-DE")).toBe("-1234.5");
+    });
+  });
+
+  describe("fr-FR (space grouping, comma decimal)", () => {
+    it("strips space grouping (regular space) and replaces comma decimal", () => {
+      expect(parseAmountInput("1 234,5", "fr-FR")).toBe("1234.5");
+      expect(parseAmountInput("1 000 000,99", "fr-FR")).toBe("1000000.99");
+    });
+
+    it("also accepts narrow no-break space (\\u202f) as grouping", () => {
+      expect(parseAmountInput("1 234,5", "fr-FR")).toBe("1234.5");
+      expect(parseAmountInput("1 234,5", "fr-FR")).toBe("1234.5");
+    });
+
+    it("handles plain integer without grouping", () => {
+      expect(parseAmountInput("1234,5", "fr-FR")).toBe("1234.5");
+    });
+  });
+
+  describe("defaults to en-US when locale omitted", () => {
+    it("uses en-US separators when no locale is passed", () => {
+      expect(parseAmountInput("1,234.50")).toBe("1234.50");
+    });
+  });
+
+  describe("composes with toStroops", () => {
+    it("round-trips en-US input through toStroops", () => {
+      expect(toStroops(parseAmountInput("1,234.50", "en-US"))).toBe(12_345_000_000n);
+    });
+
+    it("round-trips de-DE input through toStroops", () => {
+      expect(toStroops(parseAmountInput("1.234,5", "de-DE"))).toBe(12_345_000_000n);
+    });
+
+    it("round-trips fr-FR input through toStroops", () => {
+      expect(toStroops(parseAmountInput("1 234,5", "fr-FR"))).toBe(12_345_000_000n);
+    });
+  });
+
+  describe("error cases", () => {
+    it("throws ValidationError for empty input", () => {
+      expect(() => parseAmountInput("")).toThrow(ValidationError);
+      expect(() => parseAmountInput("   ")).toThrow(ValidationError);
+    });
+
+    it("throws ValidationError for non-numeric input", () => {
+      expect(() => parseAmountInput("abc", "en-US")).toThrow(ValidationError);
+      expect(() => parseAmountInput("1e5", "en-US")).toThrow(ValidationError);
+    });
+
+    it("throws ValidationError when two decimal separators appear (en-US)", () => {
+      expect(() => parseAmountInput("1.2.3", "en-US")).toThrow(ValidationError);
+    });
+
+    it("throws ValidationError when two decimal separators appear (de-DE)", () => {
+      expect(() => parseAmountInput("1,2,3", "de-DE")).toThrow(ValidationError);
+    });
+
+    it("throws ValidationError for unrecognised locale", () => {
+      expect(() => parseAmountInput("1.5", "not-a-locale")).toThrow(ValidationError);
+    });
+  });
 });
