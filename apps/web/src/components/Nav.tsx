@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import { NetworkBadge } from "@/components/NetworkBadge";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { XlmBalance } from "@/components/XlmBalance";
 import { shortAddress } from "@/lib/network";
 import { useWallet } from "@/lib/wallet";
@@ -76,6 +77,7 @@ export function Nav() {
 
         <div className="nav__spacer" />
 
+        <ThemeToggle />
         <NetworkBadge />
 
         {address ? (
