@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { GeistSans } from "geist/font/sans";
 
 import { Nav } from "@/components/Nav";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { NetworkGuard } from "@/components/NetworkGuard";
 import { SessionActivityPanel } from "@/components/SessionActivityPanel";
 import { ToastProvider } from "@/components/ToastProvider";
@@ -28,6 +29,14 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={GeistSans.variable}>
+      {/* Anti-FOUC: apply stored theme before first paint so there is no flash. */}
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('theme');if(t==='light'||t==='dark'){document.documentElement.setAttribute('data-theme',t);}}catch(e){}})();`,
+          }}
+        />
+      </head>
       <body>
         <ToastProvider>
         <RpcProvider>
