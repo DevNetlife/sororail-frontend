@@ -14,6 +14,10 @@
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
+    "./stellar-wallets-kit": {
+      "types": "./dist/signers/stellar-wallets-kit.d.ts",
+      "import": "./dist/signers/stellar-wallets-kit.js",
+      "require": "./dist/signers/stellar-wallets-kit.cjs"
     "./errors": {
       "types": "./dist/errors/index.d.ts",
       "import": "./dist/errors/index.js",
@@ -57,6 +61,14 @@
   "dependencies": {
     "@stellar/stellar-sdk": "^17.0.1",
     "sororail-frontend": "file:../.."
+  },
+  "peerDependencies": {
+    "@creit.tech/stellar-wallets-kit": ">=0.9.0"
+  },
+  "peerDependenciesMeta": {
+    "@creit.tech/stellar-wallets-kit": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^2.1.9",
