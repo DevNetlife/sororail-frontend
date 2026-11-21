@@ -112,6 +112,7 @@ export {
   STROOPS_DECIMALS,
   formatAmount,
   fromStroops,
+  parseAmountInput,
   requirePositive,
   toStroops,
 } from "./utils/amounts.js";
