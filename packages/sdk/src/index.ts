@@ -74,6 +74,7 @@ export {
   ContractError,
   NetworkError,
   SororailError,
+  TimeoutError,
   ValidationError,
   ErrorCode,
   contractForCode,
@@ -136,6 +137,8 @@ export { splitBps } from "./utils/math.js";
 
 export { waitForTransaction } from "./utils/transaction.js";
 export type { TransactionResult, TransactionStatus, WaitForTransactionOptions } from "./utils/transaction.js";
+
+export { accruedAt, vestedAt } from "./utils/accrual.js";
 
 export { decodeEvent } from "./events/index.js";
 export type { DecodedEvent, RawEvent } from "./events/index.js";

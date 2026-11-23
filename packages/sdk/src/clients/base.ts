@@ -8,7 +8,7 @@ import {
   type xdr,
 } from "@stellar/stellar-sdk";
 
-import { NetworkError, ValidationError, decodeError } from "../errors/index.js";
+import { NetworkError, TimeoutError, ValidationError, decodeError } from "../errors/index.js";
 import type { Signer } from "../signers/index.js";
 import { isValidAccountId, isValidContractId } from "../utils/validation.js";
 
@@ -58,6 +58,28 @@ export interface ClientOptions {
     /** Base delay in milliseconds before the first retry. Defaults to 100. */
     baseDelayMs?: number;
   };
+  /**
+   * Maximum time in milliseconds to wait for each RPC call.
+   *
+   * When exceeded, the call is aborted with a TimeoutError. Applies to
+   * simulations, submissions, and reads. Does not affect transaction
+   * confirmation polling (use timeoutSeconds for that).
+   */
+  timeoutMs?: number;
+  /**
+   * Multiplier applied to simulated fees before submission. Defaults to 1.0.
+   *
+   * Use values greater than 1.0 during surge pricing to reduce the chance of
+   * txINSUFFICIENT_FEE failures. For example, 1.5 adds a 50% buffer.
+   */
+  feeMultiplier?: number;
+  /**
+   * Maximum fee in stroops willing to pay after the multiplier is applied.
+   *
+   * When the computed fee exceeds this cap, the transaction is rejected before
+   * submission. Protects against runaway costs during extreme network load.
+   */
+  maxFee?: string;
 }
 
 /** A submitted transaction and its decoded return value. */
@@ -83,6 +105,8 @@ export class PreparedCall<T> {
   readonly #networkPassphrase: string;
   readonly #retryConfig: { attempts: number; baseDelayMs: number };
   readonly #signal?: AbortSignal;
+  readonly #feeMultiplier: number;
+  readonly #maxFee?: string;
 
   constructor(args: {
     server: rpc.Server;
@@ -91,6 +115,8 @@ export class PreparedCall<T> {
     networkPassphrase: string;
     retryConfig: { attempts: number; baseDelayMs: number };
     signal?: AbortSignal;
+    feeMultiplier?: number;
+    maxFee?: string;
   }) {
     this.#server = args.server;
     this.#built = args.built;
@@ -98,6 +124,8 @@ export class PreparedCall<T> {
     this.#networkPassphrase = args.networkPassphrase;
     this.#retryConfig = args.retryConfig;
     this.#signal = args.signal;
+    this.#feeMultiplier = args.feeMultiplier ?? 1.0;
+    this.#maxFee = args.maxFee;
   }
 
   /** The unsigned transaction, as base64 XDR. */
@@ -112,7 +140,7 @@ export class PreparedCall<T> {
     let lastError: unknown;
     for (let attempt = 0; attempt < this.#retryConfig.attempts; attempt++) {
       if (this.#signal?.aborted) {
-        throw new NetworkError("Operation aborted by signal.");
+        throw new TimeoutError("RPC call aborted: request timeout exceeded.");
       }
 
       try {
@@ -194,6 +222,23 @@ export class PreparedCall<T> {
       assembled = await this.#server.prepareTransaction(this.#built);
     } catch (cause) {
       throw decodeError(cause);
+    }
+
+    if (this.#feeMultiplier > 1.0) {
+      const currentFee = BigInt(assembled.fee);
+      const adjustedFee = BigInt(Math.ceil(Number(currentFee) * this.#feeMultiplier));
+      
+      if (this.#maxFee !== undefined) {
+        const maxFeeBigInt = BigInt(this.#maxFee);
+        if (adjustedFee > maxFeeBigInt) {
+          throw new ValidationError(
+            `Computed fee ${adjustedFee} exceeds maxFee ${this.#maxFee}. Current network conditions require more than the configured maximum.`,
+          );
+        }
+      }
+
+      assembled = TransactionBuilder.cloneFrom(assembled, { fee: adjustedFee.toString() })
+        .build();
     }
 
     const signedXdr = await signer.signTransaction(assembled.toXDR(), {
@@ -278,6 +323,68 @@ export abstract class BaseClient {
     return this.options.contractId;
   }
 
+  /**
+   * Fetches contract events with automatic pagination.
+   *
+   * Returns an async iterable that handles cursor-based pagination and the RPC
+   * retention window. Events are yielded as decoded XDR values ready for
+   * further processing with decodeEvent.
+   *
+   * @param options.fromLedger Starting ledger sequence (inclusive). Defaults to 0.
+   * @param options.limit Maximum number of events to fetch per page. Defaults to 100.
+   * @yields Raw events with topics and data
+   */
+  async *events(options?: {
+    fromLedger?: number;
+    limit?: number;
+  }): AsyncIterable<{ topics: xdr.ScVal[]; data: xdr.ScVal; ledger: number }> {
+    const limit = options?.limit ?? 100;
+    let startLedger = options?.fromLedger ?? 0;
+    let cursor: string | undefined;
+
+    while (true) {
+      let response: rpc.Api.GetEventsResponse;
+      try {
+        response = await this.server.getEvents({
+          startLedger,
+          filters: [
+            {
+              type: "contract",
+              contractIds: [this.contractId],
+            },
+          ],
+          limit,
+          cursor,
+        });
+      } catch (cause) {
+        const message = cause instanceof Error ? cause.message : String(cause);
+        if (message.includes("ledger") && message.includes("not found")) {
+          return;
+        }
+        throw new NetworkError("Could not fetch events.", { cause });
+      }
+
+      if (response.events.length === 0) {
+        return;
+      }
+
+      for (const event of response.events) {
+        if (event.type === "contract" && event.contractId === this.contractId) {
+          yield {
+            topics: event.topic,
+            data: event.value,
+            ledger: Number(event.ledger),
+          };
+        }
+      }
+
+      cursor = response.events[response.events.length - 1]?.pagingToken;
+      if (!cursor || response.events.length < limit) {
+        return;
+      }
+    }
+  }
+
   /** Builds a call without simulating or sending it. */
   protected async prepare<T>(
     method: string,
@@ -285,17 +392,24 @@ export abstract class BaseClient {
     parse: (value: unknown) => T,
     signal?: AbortSignal,
   ): Promise<PreparedCall<T>> {
-    const { publicKey, networkPassphrase } = this.options;
+    const { publicKey, networkPassphrase, timeoutMs } = this.options;
     if (!publicKey) {
       throw new ValidationError(
         "This client has no publicKey, so it cannot build a transaction. Pass one when constructing the client — the signer's address is the usual choice.",
       );
     }
 
+    const effectiveSignal = timeoutMs !== undefined
+      ? AbortSignal.timeout(timeoutMs)
+      : signal;
+
     let source;
     try {
       source = await this.server.getAccount(publicKey);
     } catch (cause) {
+      if (effectiveSignal?.aborted) {
+        throw new TimeoutError("RPC call aborted: request timeout exceeded.");
+      }
       throw new NetworkError(
         `Could not load account ${publicKey}. On testnet an account must be funded by friendbot before it can be used.`,
         { cause },
@@ -321,7 +435,9 @@ export abstract class BaseClient {
       parse,
       networkPassphrase,
       retryConfig,
-      signal,
+      signal: effectiveSignal,
+      feeMultiplier: this.options.feeMultiplier,
+      maxFee: this.options.maxFee,
     });
   }
 

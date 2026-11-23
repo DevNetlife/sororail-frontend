@@ -111,6 +111,11 @@ export class NetworkError extends SororailError {
   override readonly name: string = "NetworkError";
 }
 
+/** Thrown when an RPC call exceeds the configured timeout. */
+export class TimeoutError extends SororailError {
+  override readonly name: string = "TimeoutError";
+}
+
 /** Thrown when arguments fail validation before anything is sent. */
 export class ValidationError extends SororailError {
   override readonly name: string = "ValidationError";
