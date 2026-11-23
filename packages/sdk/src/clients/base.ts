@@ -10,6 +10,7 @@ import {
 
 import { NetworkError, ValidationError, decodeError } from "../errors/index.js";
 import type { Signer } from "../signers/index.js";
+import { isValidAccountId, isValidContractId } from "../utils/validation.js";
 
 /** Connection and contract details every client needs. */
 export interface ClientOptions {
@@ -45,6 +46,18 @@ export interface ClientOptions {
    * HTTPS (the default; this must remain `false`).
    */
   allowHttp?: boolean;
+  /**
+   * Retry configuration for transient RPC errors.
+   *
+   * Defaults to 3 attempts with 100ms base delay and exponential backoff.
+   * Only idempotent reads and simulations are retried; submissions never are.
+   */
+  retry?: {
+    /** Maximum number of attempts (including the initial call). Defaults to 3. */
+    attempts?: number;
+    /** Base delay in milliseconds before the first retry. Defaults to 100. */
+    baseDelayMs?: number;
+  };
 }
 
 /** A submitted transaction and its decoded return value. */
@@ -68,22 +81,70 @@ export class PreparedCall<T> {
   readonly #built: Transaction;
   readonly #parse: (value: unknown) => T;
   readonly #networkPassphrase: string;
+  readonly #retryConfig: { attempts: number; baseDelayMs: number };
+  readonly #signal?: AbortSignal;
 
   constructor(args: {
     server: rpc.Server;
     built: Transaction;
     parse: (value: unknown) => T;
     networkPassphrase: string;
+    retryConfig: { attempts: number; baseDelayMs: number };
+    signal?: AbortSignal;
   }) {
     this.#server = args.server;
     this.#built = args.built;
     this.#parse = args.parse;
     this.#networkPassphrase = args.networkPassphrase;
+    this.#retryConfig = args.retryConfig;
+    this.#signal = args.signal;
   }
 
   /** The unsigned transaction, as base64 XDR. */
   toXDR(): string {
     return this.#built.toXDR();
+  }
+
+  async #retryOnTransient<T>(
+    operation: () => Promise<T>,
+    isRetryable: (error: unknown) => boolean,
+  ): Promise<T> {
+    let lastError: unknown;
+    for (let attempt = 0; attempt < this.#retryConfig.attempts; attempt++) {
+      if (this.#signal?.aborted) {
+        throw new NetworkError("Operation aborted by signal.");
+      }
+
+      try {
+        return await operation();
+      } catch (error) {
+        lastError = error;
+        if (!isRetryable(error) || attempt === this.#retryConfig.attempts - 1) {
+          throw error;
+        }
+
+        const delay = this.#retryConfig.baseDelayMs * 2 ** attempt;
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+    throw lastError;
+  }
+
+  #isTransientError(error: unknown): boolean {
+    if (error instanceof NetworkError) {
+      const cause = error.cause;
+      if (cause instanceof Error) {
+        const message = cause.message.toLowerCase();
+        if (message.includes("429") || message.includes("503") || message.includes("econnreset") || message.includes("network")) {
+          return true;
+        }
+      }
+    }
+    if (error instanceof Error) {
+      const message = error.message.toLowerCase();
+      return message.includes("429") || message.includes("503") || message.includes("econnreset");
+    }
+    return false;
   }
 
   /**
@@ -94,26 +155,31 @@ export class PreparedCall<T> {
    * a signature is requested and before any fee is spent.
    */
   async simulate(): Promise<T> {
-    let response: rpc.Api.SimulateTransactionResponse;
-    try {
-      response = await this.#server.simulateTransaction(this.#built);
-    } catch (cause) {
-      throw new NetworkError("Could not reach the network to simulate this call.", {
-        cause,
-      });
-    }
+    return this.#retryOnTransient(
+      async () => {
+        let response: rpc.Api.SimulateTransactionResponse;
+        try {
+          response = await this.#server.simulateTransaction(this.#built);
+        } catch (cause) {
+          throw new NetworkError("Could not reach the network to simulate this call.", {
+            cause,
+          });
+        }
 
-    if (rpc.Api.isSimulationError(response)) {
-      throw decodeError(response.error);
-    }
-    if (!rpc.Api.isSimulationSuccess(response)) {
-      throw new NetworkError(
-        "The simulation did not complete. The network may be restoring archived state.",
-      );
-    }
+        if (rpc.Api.isSimulationError(response)) {
+          throw decodeError(response.error);
+        }
+        if (!rpc.Api.isSimulationSuccess(response)) {
+          throw new NetworkError(
+            "The simulation did not complete. The network may be restoring archived state.",
+          );
+        }
 
-    const retval = response.result?.retval;
-    return this.#parse(retval === undefined ? undefined : scValToNative(retval));
+        const retval = response.result?.retval;
+        return this.#parse(retval === undefined ? undefined : scValToNative(retval));
+      },
+      (error) => this.#isTransientError(error),
+    );
   }
 
   /**
@@ -190,6 +256,16 @@ export abstract class BaseClient {
   protected readonly options: ClientOptions;
 
   constructor(options: ClientOptions) {
+    if (!isValidContractId(options.contractId)) {
+      throw new ValidationError(
+        `Invalid contract ID: "${options.contractId}". Expected a valid C... StrKey address.`,
+      );
+    }
+    if (options.publicKey && !isValidAccountId(options.publicKey)) {
+      throw new ValidationError(
+        `Invalid public key: "${options.publicKey}". Expected a valid G... StrKey address.`,
+      );
+    }
     this.options = options;
     this.server = new rpc.Server(options.rpcUrl, {
       allowHttp: options.allowHttp ?? false,
@@ -207,6 +283,7 @@ export abstract class BaseClient {
     method: string,
     args: xdr.ScVal[],
     parse: (value: unknown) => T,
+    signal?: AbortSignal,
   ): Promise<PreparedCall<T>> {
     const { publicKey, networkPassphrase } = this.options;
     if (!publicKey) {
@@ -233,11 +310,18 @@ export abstract class BaseClient {
       .setTimeout(this.options.timeoutSeconds ?? 30)
       .build();
 
+    const retryConfig = {
+      attempts: this.options.retry?.attempts ?? 3,
+      baseDelayMs: this.options.retry?.baseDelayMs ?? 100,
+    };
+
     return new PreparedCall({
       server: this.server,
       built,
       parse,
       networkPassphrase,
+      retryConfig,
+      signal,
     });
   }
 
@@ -246,8 +330,9 @@ export abstract class BaseClient {
     method: string,
     args: xdr.ScVal[],
     parse: (value: unknown) => T,
+    signal?: AbortSignal,
   ): Promise<T> {
-    const call = await this.prepare(method, args, parse);
+    const call = await this.prepare(method, args, parse, signal);
     return call.simulate();
   }
 }

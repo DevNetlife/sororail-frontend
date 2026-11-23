@@ -1,6 +1,6 @@
 "use client";
 
-import { StrKey } from "@stellar/stellar-sdk";
+import { isValidContractId } from "@sororail/sdk";
 
 export type PositionKind = "stream" | "vesting" | "escrow";
 
@@ -280,6 +280,5 @@ export function importPositions(json: string): ImportPositionsResult {
 
 /** A contract address is a 56-character `C…` strkey. */
 export function looksLikeContractId(value: string): boolean {
-  const trimmed = value.trim().toUpperCase();
-  return StrKey.isValidContract(trimmed);
+  return isValidContractId(value);
 }
