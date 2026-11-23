@@ -10,6 +10,7 @@ import {
   errorCodeNames,
   errorMessages,
   extractErrorCode,
+  isContractError,
 } from "../src/errors/index.js";
 
 describe("the code table", () => {
@@ -125,5 +126,38 @@ describe("decodeError", () => {
     const error = decodeError("Error(Contract, #101)") as ContractError;
     expect(error.variant).toBe("BatchTooLarge");
     expect(error.message).toMatch(/maxRecipients/);
+  });
+});
+
+describe("isContractError", () => {
+  it("narrows unknown to ContractError with specific variant", () => {
+    const error: unknown = new ContractError(
+      43,
+      "StreamInsufficientAccrued",
+      "test",
+    );
+
+    if (isContractError(error, "StreamInsufficientAccrued")) {
+      expect(error.variant).toBe("StreamInsufficientAccrued");
+      const _typeCheck: "StreamInsufficientAccrued" = error.variant;
+    } else {
+      throw new Error("Should have narrowed");
+    }
+  });
+
+  it("returns false for wrong variant", () => {
+    const error: unknown = new ContractError(
+      43,
+      "StreamInsufficientAccrued",
+      "test",
+    );
+    expect(isContractError(error, "EscrowNotFundable")).toBe(false);
+  });
+
+  it("returns false for non-ContractError", () => {
+    expect(isContractError(new Error("test"), "StreamInsufficientAccrued")).toBe(false);
+    expect(isContractError(new NetworkError("test"), "StreamInsufficientAccrued")).toBe(false);
+    expect(isContractError("string", "StreamInsufficientAccrued")).toBe(false);
+    expect(isContractError(null, "StreamInsufficientAccrued")).toBe(false);
   });
 });

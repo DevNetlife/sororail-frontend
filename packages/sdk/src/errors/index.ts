@@ -74,6 +74,27 @@ export class ContractError extends SororailError {
   is(variant: ErrorCodeName): boolean {
     return this.variant === variant;
   }
+}
+
+/**
+ * Type guard that narrows an unknown error to a ContractError with a specific code.
+ *
+ * Usage:
+ * ```ts
+ * try {
+ *   await stream.withdraw();
+ * } catch (e) {
+ *   if (isContractError(e, "StreamInsufficientAccrued")) {
+ *     // e is narrowed to ContractError with variant "StreamInsufficientAccrued"
+ *   }
+ * }
+ * ```
+ */
+export function isContractError<T extends ErrorCodeName>(
+  error: unknown,
+  name: T,
+): error is ContractError & { variant: T } {
+  return error instanceof ContractError && error.variant === name;
 
   override toJSON() {
     return {

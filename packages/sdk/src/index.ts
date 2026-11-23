@@ -81,6 +81,7 @@ export {
   errorCodeNames,
   errorMessages,
   extractErrorCode,
+  isContractError,
   throwDecoded,
 } from "./errors/index.js";
 export type { ContractName, ErrorCodeName, ErrorCodeValue } from "./errors/index.js";
@@ -130,3 +131,11 @@ export { ratePerSecond } from "./utils/rates.js";
 export type { RateResult } from "./utils/rates.js";
 
 export { isValidAccountId, isValidContractId } from "./utils/validation.js";
+
+export { splitBps } from "./utils/math.js";
+
+export { waitForTransaction } from "./utils/transaction.js";
+export type { TransactionResult, TransactionStatus, WaitForTransactionOptions } from "./utils/transaction.js";
+
+export { decodeEvent } from "./events/index.js";
+export type { DecodedEvent, RawEvent } from "./events/index.js";
