@@ -115,3 +115,18 @@ export {
   requirePositive,
   toStroops,
 } from "./utils/amounts.js";
+
+export {
+  toUnixSeconds,
+  fromUnixSeconds,
+  seconds,
+  minutes,
+  hours,
+  days,
+  weeks,
+} from "./utils/time.js";
+
+export { ratePerSecond } from "./utils/rates.js";
+export type { RateResult } from "./utils/rates.js";
+
+export { isValidAccountId, isValidContractId } from "./utils/validation.js";

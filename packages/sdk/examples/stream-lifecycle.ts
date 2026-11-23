@@ -23,28 +23,10 @@ import {
   formatAmount,
   fromStroops,
   toStroops,
+  toUnixSeconds,
+  seconds,
 } from "../src/index.js";
- testnet-rpc-validation-sdk-example-config
 import { NETWORK, RPC_URL, TOKEN as NATIVE_TOKEN, required } from "./_shared.js";
-
-import { check, checkEqual } from "./support.js";
-
-const RPC_URL = process.env["RPC_URL"] ?? "https://soroban-testnet.stellar.org";
-const NETWORK = process.env["NETWORK_PASSPHRASE"] ?? Networks.TESTNET;
-/** Native XLM's Stellar Asset Contract on testnet. */
-const NATIVE_TOKEN =
-  process.env["TOKEN_ID"] ??
-  "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC";
-
-function required(name: string): string {
-  const value = process.env[name];
-  if (!value) {
-    console.error(`Set ${name} before running this example.`);
-    process.exit(1);
-  }
-  return value;
-}
- main
 
 async function main(): Promise<void> {
   const signer = new KeypairSigner(required("SOROBAN_SECRET_KEY"));
@@ -63,9 +45,9 @@ async function main(): Promise<void> {
 
   // 100 stroops/second for 60 seconds: 6000 stroops total, pulled up front.
   const ratePerSecond = 100n;
-  const now = BigInt(Math.floor(Date.now() / 1000));
+  const now = toUnixSeconds(new Date());
   const start = now;
-  const stop = now + 60n;
+  const stop = now + 60n * seconds;
 
   console.log("sender   ", signer.publicKey);
   console.log("recipient", recipient);
